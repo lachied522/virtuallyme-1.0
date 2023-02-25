@@ -1,0 +1,7 @@
+gunicorn
+Flask
+Flask-SQLAlchemy
+SQLAlchemy
+psycopg2
+openai
+google-api-python-client
