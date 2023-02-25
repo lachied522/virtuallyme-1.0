@@ -14,7 +14,6 @@ openai.api_key = OPENAI_API_KEY
 GOOGLE_API_KEY = "AIzaSyCm-gGY014pfYImeiLMqCYuNGQ1nf8g2eg"
 GOOGLE_CSE_ID = "d7251a9905c2540fa"
 
-
 def openai_call(prompt, max_tokens, temperature, presence_penalty):
     try:
         model='text-davinci-003'

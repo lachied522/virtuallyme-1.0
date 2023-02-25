@@ -3,10 +3,9 @@ from flask_sqlalchemy import SQLAlchemy
 
 import json
 
-from database import DATABASE_URL
-
 from virtuallyme import *
 
+from database import DATABASE_URL
 
 app = Flask(__name__)
 
@@ -25,7 +24,6 @@ class User(db.Model):
 
     def __repr__(self):
         return f'<User "{self.id}">'
-
 
 class Job(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -162,19 +160,14 @@ def handle_task():
     
     #construct prompt
     #preliminaries
-    
     description = user.description or ""
 
-    prompt = f"You are my writing assistant. You must adapt to my writing style by replicating the nuances of my writing."
+    prompt = f"You are my writing assistant. You must give responses that replicate the complexity and burstiness of my writing, including my word choice, tonality, sentence structure, semantics and syntax."
     if description != "":
-        #if user description exists
-        prompt += f" Below is a description of my writing style.\nDescription: {description}"
-
-
+        prompt += f"\n{description}"
     
     prompt += "\nMe: "
     for prompt_completion in rank_samples(topic, samples):
-        print(len(search_result["result"].split()))
         if len(prompt.split())+len(prompt_completion["completion"].split()) > 2250-len(additional.split())-len(description.split())-len(search_result["result"].split()):
             ##prompt limit 3097 tokens (4097-1000 for completion)
             ##1000 tokens ~ 750 words
@@ -193,18 +186,84 @@ def handle_task():
         prompt += f"Write a {category} about {topic}. {additional}\nAI: "
 
     
-    response_text = openai_call(prompt, 1000, 0.9, 0.6)
+    completion = openai_call(prompt, 1000, 0.9, 0.6)
 
     if request.json["search"] and search_result["result"] != "":
         #if web search was successful, return the url
-        response_text += "Source: " + str(search_result["url"])
-        
+        completion += "Source: " + str(search_result["url"])
 
-    return json.dumps({"completion": response_text})
+    #store task data    
+    task = Task(prompt = f"Write a {category} about {topic}.", completion = completion, category="task", user_id=user.id)
+    db.session.add(task)
+    db.session.commit()
+
+    return json.dumps({"completion": completion})
+
+@app.route("/handle_rewrite", methods=["GET", "POST"])
+def handle_rewrite():
+    user = User.query.get(request.json["member_id"])
+
+    text = request.json["text"]
+    additional = request.json["type"]
+
+    if request.json["job_id"] == -1:
+        #combine all job data
+        samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
+    elif request.json["job_id"] > 0:
+        job = Job.query.get(request.json["job_id"])
+        #get job data
+        samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for d in job.data]
+    else:
+        #no job data
+        samples = []
+    
+    #construct prompt
+    #preliminaries
+    description = user.description or ""
+
+    prompt = f"You are my writing assistant. You must give responses replicate the complexity and burstiness of my writing, including my word choice, tonality, sentence structure, semantics and syntax."
+    if description != "":
+        prompt += f"\n{description}"
+    
+    prompt += "\nMe: "
+    for prompt_completion in samples:
+        if len(prompt.split())+len(prompt_completion["completion"].split()) > 2250-len(text.split())-len(additional.split())-len(description.split()):
+            ##prompt limit 3097 tokens (4097-1000 for completion)
+            ##1000 tokens ~ 750 words
+            break
+        else:
+            prompt += prompt_completion["prompt"] + "\nAI: " + prompt_completion["completion"] + "\nMe: "
+            if prompt_completion["feedback"]=="negative":
+                prompt += "That didn't sound like me. "
 
 
+    prompt += f"Me: Now I want you to rewrite the following text using my writing style. {additional}\nText:{text}\nAI:"
 
+    completion = openai_call(prompt, 1000, 0.9, 0.6)
 
+    #store rewrite data    
+    rewrite = Task(prompt = text[:200], completion = completion, category="rewrite", user_id=user.id)
+    db.session.add(rewrite)
+    db.session.commit()
+
+    return json.dumps({"completion": completion})
+
+@app.route("/handle_idea", methods=["GET", "POST"])
+def handle_idea():
+    user = User.query.get(request.json["member_id"])
+    category = request.json["type"]
+    topic = request.json["topic"]
+
+    prompt = f"Generate ideas for my {category} about {topic}. Elaborate on each idea by providing specific examples of what content to include."
+
+    completion = openai_call(prompt, 500, 0.3, 0.2)
+
+    #store idea data
+    idea = Task(prompt = f"Generate ideas for my {category} about {topic}.", completion = completion, category="idea", user_id=user.id)
+    db.session.add(idea)
+    db.session.commit()
+
+    return json.dumps({"completion": completion})
 
 
 if __name__ == "__main__":
