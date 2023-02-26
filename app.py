@@ -76,9 +76,9 @@ def get_user():
     """
     Called when the page loads. Retrieves stored samples and previous task data.
 
-    :param user: user's Memberstack ID
+    :param member_id: user's Memberstack ID
     """
-    user = User.query.get(request.headers["user"])
+    user = User.query.get(request.headers["member_id"])
     
     user_jobs = []
     
@@ -347,14 +347,28 @@ def handle_feedback():
 
 @app.route("/share_job", methods=["POST"])
 def share_job():
+    """
+    Creates dummy user and job for others to use.
+
+    :param member_id: user's Memberstack ID
+    :param job_id: job that the changes have been made for
+
+    :param description: string, job description
+    :param instructions: string, job instructions
+    :param access: anyone, link, organisation
+    """
     #create a dummy user to store job data
     user = User.query.get(request.json["member_id"])
     job = Job.query.get(request.json["job_id"])
 
+    description = request.json["description"]
+    instructions = request.json["description"]
+    access = request.json["access"]
+
     #create unique id
     u = uuid.uuid4()
 
-    dummy_user = User(id = u, name = user.name, monthly_words = 0, description = user.description)
+    dummy_user = User(id = u, name = user.name, monthly_words = 0, about = user.about, description = user.description)
     db.session.add(dummy_user)
     
     dummy_job = Job(name=job.name, word_count=0, user_id=dummy_user.id)
@@ -368,7 +382,17 @@ def share_job():
     #send data to Zapier
     url = "https://hooks.zapier.com/hooks/catch/14316057/3yq371j/"
 
-    ##response = requests.post(url, data=json.dumps(data))
+    data = {
+      "id": u.hex,
+      "member": user.id,
+      "user_description": user.description,
+      "name": job.name,
+      "description": description,
+      "instructions": instructions,
+      "access": access
+    }
+
+    response = requests.post(url, data=json.dumps(data))
 
     db.session.commit()
     return Response(status=200)
