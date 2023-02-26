@@ -2,6 +2,7 @@ from flask import Flask, Response, request
 from flask_sqlalchemy import SQLAlchemy
 
 import json
+import uuid
 
 from virtuallyme import *
 
@@ -49,6 +50,12 @@ class Data(db.Model):
     feedback = db.Column(db.String(100)) #user-upload, positive, or negative
     job_id = db.Column(db.Integer, db.ForeignKey('job.id'))
 
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'user, Access-Control-Allow-Headers, Access-Control-Request-Headers, Origin, Accept, Content-Type'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    return response
 
 @app.route("/create_user", methods=["POST"])
 def create_user():
@@ -66,7 +73,7 @@ def get_user():
     
     for job in user.jobs:
         job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
-        user_jobs.append({"name": job.name, "word_count": job.word_count, "data": job_samples})
+        user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
 
     user_tasks = [{"prompt": task.prompt, "completion": task.completion} for task in user.tasks if task.category=="task"]
     user_ideas = [{"prompt": task.prompt, "completion": task.completion} for task in user.tasks if task.category=="idea"]
@@ -78,7 +85,6 @@ def get_user():
     }
 
     return Response(json.dumps(response_dict), status=200)
-
 
 @app.route("/create_job", methods=["POST"])
 def create_job():
@@ -99,19 +105,21 @@ def sync_job():
     for data in [d for d in job.data if d.feedback=="user-upload"]:
         db.session.delete(data)
     
+    word_count = 0
     for prompt_completion in new_data:
         prompt = prompt_completion["prompt"]
         completion = prompt_completion["completion"]
         db.session.add(Data(prompt=prompt, completion=completion, feedback="user-upload", job_id=job.id))
+        word_count += len(completion.split())
 
     #run description if number of words is at least 300
     #if a new sample substantially changes the sum of samples
     new_samples = [d["completion"] for d in new_data]
-    existing_samples = [d["completion"] for job in user.jobs for d in job.data]
+    existing_samples = [d.completion for job in user.jobs for d in job.data]
     
     all_samples = new_samples + existing_samples
-    all_samples_str = str("\n".join(rank_samples(all_samples)))[:8000]
-    existing_samples_str = str("\n".join(rank_samples(existing_samples)))[:8000]
+    all_samples_str = str("\n".join(sort_samples(all_samples)))[:8000]
+    existing_samples_str = str("\n".join(sort_samples(existing_samples)))[:8000]
 
     #only consider first 8,000 characters ~ 2000 words
     if len(all_samples_str.split()) > 300 and all_samples_str==existing_samples_str:
@@ -127,9 +135,13 @@ def sync_job():
             "description": description
         }
 
-        response_json = json.dumps(response_dictionary)
+        response = requests.post(url, data=json.dumps(response_dictionary))
 
-        response = requests.post(url, data=response_json)
+    #update user record
+    if job.name != request.json["job_name"]:
+        job.name = request.json["job_name"]
+
+    job.word_count = word_count
 
     db.session.commit()
     return Response(status=200)
@@ -184,17 +196,18 @@ def handle_task():
         prompt += f"Write a {category} about {topic}. {additional}. You may include the following information: {context}\nAI: "
     else:
         prompt += f"Write a {category} about {topic}. {additional}\nAI: "
-
     
     completion = openai_call(prompt, 1000, 0.9, 0.6)
 
     if request.json["search"] and search_result["result"] != "":
         #if web search was successful, return the url
-        completion += "Source: " + str(search_result["url"])
+        completion += "\nSource: " + str(search_result["url"])
 
     #store task data    
     task = Task(prompt = f"Write a {category} about {topic}.", completion = completion, category="task", user_id=user.id)
     db.session.add(task)
+    #update word count
+    user.monthly_words += len(completion.split())
     db.session.commit()
 
     return json.dumps({"completion": completion})
@@ -204,7 +217,7 @@ def handle_rewrite():
     user = User.query.get(request.json["member_id"])
 
     text = request.json["text"]
-    additional = request.json["type"]
+    additional = request.json["additional"]
 
     if request.json["job_id"] == -1:
         #combine all job data
@@ -244,6 +257,9 @@ def handle_rewrite():
     #store rewrite data    
     rewrite = Task(prompt = text[:200], completion = completion, category="rewrite", user_id=user.id)
     db.session.add(rewrite)
+    #update word count
+    user.monthly_words += len(completion.split())
+
     db.session.commit()
 
     return json.dumps({"completion": completion})
@@ -256,14 +272,62 @@ def handle_idea():
 
     prompt = f"Generate ideas for my {category} about {topic}. Elaborate on each idea by providing specific examples of what content to include."
 
-    completion = openai_call(prompt, 500, 0.3, 0.2)
+    completion = openai_call(prompt, 600, 0.3, 0.2)
 
     #store idea data
     idea = Task(prompt = f"Generate ideas for my {category} about {topic}.", completion = completion, category="idea", user_id=user.id)
     db.session.add(idea)
+    #update word count
+    user.monthly_words += len(completion.split())
+    
     db.session.commit()
 
     return json.dumps({"completion": completion})
+
+@app.route("/handle_feedback", methods=["GET", "POST"])
+def handle_feedback():
+    if request.json["job_id"] > 0:
+        job = Job.query.get(request.json["job_id"])
+        prompt = request.json["prompt"]
+        completion = request.json["completion"]
+        feedback = request.json["feedback"]
+
+        db.session.add(Data(prompt=prompt, completion=completion, feedback=feedback, job_id=job.id))
+        db.session.commit()
+    else:
+        #if job number not specified, do nothing
+        pass
+    
+    return Response(status=200)
+
+
+@app.route("/share_job", methods=["POST"])
+def share_job():
+    #create a dummy user to store job data
+    user = User.query.get(request.json["member_id"])
+    job = Job.query.get(request.json["job_id"])
+
+    #create unique id
+    u = uuid.uuid4()
+
+    dummy_user = User(id = u, name = user.name, monthly_words = 0, description = user.description)
+    db.session.add(dummy_user)
+    
+    dummy_job = Job(name=job.name, word_count=0, user_id=dummy_user.id)
+    db.session.add(dummy_job)
+
+    db.session.flush()
+
+    for d in job.data:
+        db.session.add(Data(prompt=d.prompt, completion=d.completion, feedback="user-upload", job_id=dummy_job.id))
+
+    #send data to Zapier
+    url = "https://hooks.zapier.com/hooks/catch/14316057/3yq371j/"
+
+    ##response = requests.post(url, data=json.dumps(data))
+
+    db.session.commit()
+    return Response(status=200)
 
 
 if __name__ == "__main__":
