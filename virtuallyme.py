@@ -110,4 +110,8 @@ def rank_samples(prompt, samples):
             word_counts[i] = count
         
         return [item for index, item in sorted(enumerate(samples), key = lambda x: word_counts[x[0]], reverse=True)]
+    
 
+
+def sort_samples(samples):
+    return list(dict.fromkeys(sorted(samples,key=len,reverse=True)))
