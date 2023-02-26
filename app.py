@@ -18,8 +18,9 @@ db = SQLAlchemy(app)
 class User(db.Model):
     id = db.Column(db.String(100), primary_key=True) #get from Memberstack
     name = db.Column(db.String(100))
-    monthly_words = db.Column(db.Integer)
+    about = db.Column(db.Text)
     description = db.Column(db.Text)
+    monthly_words = db.Column(db.Integer)
     jobs = db.relationship('Job', backref='user', lazy='joined')
     tasks = db.relationship('Task', backref='user', lazy='joined')
 
@@ -59,6 +60,12 @@ def add_cors_headers(response):
 
 @app.route("/create_user", methods=["POST"])
 def create_user():
+    """
+    Called when a user signs up. Creates empty user object in DB.
+
+    :param member_id: user's Memberstack ID
+    :param name: user's first name    
+    """
     user = User(id = request.json["member_id"], name = request.json["name"], monthly_words = 0)
     db.session.add(user)
     db.session.commit()
@@ -66,7 +73,11 @@ def create_user():
 
 @app.route("/get_user", methods=["GET"])
 def get_user():
-    #format data to return to user on page load
+    """
+    Called when the page loads. Retrieves stored samples and previous task data.
+
+    :param user: user's Memberstack ID
+    """
     user = User.query.get(request.headers["user"])
     
     user_jobs = []
@@ -88,6 +99,12 @@ def get_user():
 
 @app.route("/create_job", methods=["POST"])
 def create_job():
+    """
+    Called when a new job is created. Creates Job object in DB.
+
+    :param member_id: user's Memberstack ID
+    :param job_name: job name
+    """
     user = User.query.get(request.json["member_id"])
     job = Job(name=request.json["job_name"], word_count=0, user_id=user.id)
     db.session.add(job)
@@ -96,7 +113,13 @@ def create_job():
 
 @app.route("/sync_job", methods=["POST"])
 def sync_job():
-    #receives job data as list of dict objects with prompt, completion key
+    """
+    Called when user has made changes to samples data.
+
+    :param member_id: user's Memberstack ID
+    :param job_id: job that the changes have been made for
+    :param data: list of dicts containing prompt, completion pairs
+    """
     user = User.query.get(request.json["member_id"])
     job = Job.query.get(request.json["job_id"])
     
@@ -148,6 +171,14 @@ def sync_job():
 
 @app.route("/handle_task", methods=["GET", "POST"])
 def handle_task():
+    """
+    :param member_id: user's Memberstack ID
+    :param job_id: job that the changes have been made for
+    :param type: string, type of response to generate
+    :param topic: string, subject of response
+    :param additional: string, additional information user might provide
+    :param search: bool, specifies whether to search the web
+    """
     user = User.query.get(request.json["member_id"])
 
     category = request.json["type"]
@@ -172,11 +203,14 @@ def handle_task():
     
     #construct prompt
     #preliminaries
+    about = user.about or ""
     description = user.description or ""
 
     prompt = f"You are my writing assistant. You must give responses that replicate the complexity and burstiness of my writing, including my word choice, tonality, sentence structure, semantics and syntax."
+    if about != "":
+        prompt += f"\nHere is some information about me: {about}"
     if description != "":
-        prompt += f"\n{description}"
+        prompt += f"\nHere is a description of my writing style: {description}"
     
     prompt += "\nMe: "
     for prompt_completion in rank_samples(topic, samples):
@@ -200,7 +234,7 @@ def handle_task():
     completion = openai_call(prompt, 1000, 0.9, 0.6)
 
     if request.json["search"] and search_result["result"] != "":
-        #if web search was successful, return the url
+        #if web search was successful, return the source
         completion += "\nSource: " + str(search_result["url"])
 
     #store task data    
@@ -214,6 +248,12 @@ def handle_task():
 
 @app.route("/handle_rewrite", methods=["GET", "POST"])
 def handle_rewrite():
+    """
+    :param member_id: user's Memberstack ID
+    :param job_id: job that the changes have been made for
+    :param text: string, text to be rewritten
+    :param additional: string, additional information user might provide
+    """
     user = User.query.get(request.json["member_id"])
 
     text = request.json["text"]
@@ -232,14 +272,18 @@ def handle_rewrite():
     
     #construct prompt
     #preliminaries
+    about = user.about or ""
     description = user.description or ""
 
     prompt = f"You are my writing assistant. You must give responses replicate the complexity and burstiness of my writing, including my word choice, tonality, sentence structure, semantics and syntax."
+    if about != "":
+        prompt += f"\nHere is some information about me: {about}"
     if description != "":
-        prompt += f"\n{description}"
+        prompt += f"\nHere is a description of my writing style: {description}"
     
     prompt += "\nMe: "
-    for prompt_completion in samples:
+    #given no topic context, samples are simply sorted by length
+    for prompt_completion in sort_samples(samples):
         if len(prompt.split())+len(prompt_completion["completion"].split()) > 2250-len(text.split())-len(additional.split())-len(description.split()):
             ##prompt limit 3097 tokens (4097-1000 for completion)
             ##1000 tokens ~ 750 words
@@ -331,5 +375,5 @@ def share_job():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", debug=True)
+    app.run()
     

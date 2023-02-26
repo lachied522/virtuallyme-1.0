@@ -95,8 +95,12 @@ def search_web(query):
         return {"result": ""}
     
 def rank_samples(prompt, samples):
-    ##sort samples by how frequently common words appear
-    ##only consider words >3 characters
+    """
+    sort samples by how frequently common words appear, only consider words >3 characters
+    
+    :param prompt: string to run ranking on
+    :param samples: list of dicts containing prompt, completion pairs
+    """
     if len(samples)==0:
         return []
     else:
