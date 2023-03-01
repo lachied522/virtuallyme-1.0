@@ -2,9 +2,14 @@ import json
 import requests
 from bs4 import BeautifulSoup
 
+import openai
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
 from apiclient.discovery import build
 
-import openai
+
 
 ##openai api key
 OPENAI_API_KEY = "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"
@@ -51,7 +56,7 @@ def sum_webpage(url):
     soup = BeautifulSoup(html.text, features="html.parser")
 
     # kill all script and style elements
-    for script in soup(["script", "style", "a", "header", "footer"]):
+    for script in soup(["script", "style", "a", "header", "footer", "nav"]):
         script.extract()    # rip it out
 
     # get text
@@ -101,6 +106,10 @@ def rank_samples(prompt, samples):
     :param prompt: string to run ranking on
     :param samples: list of dicts containing prompt, completion pairs
     """
+    #vectorizer = TfidfVectorizer()
+    #tfidf_matrix = vectorizer.fit_transform([s for s in samples[i]["prompt"].split() if len(s) > 3])
+    #prompt_tfidf = vectorizer.transform([prompt])
+    #cosine_similarities = cosine_similarity(prompt_tfidf, tfidf_matrix).flatten()
     if len(samples)==0:
         return []
     else:
@@ -115,7 +124,6 @@ def rank_samples(prompt, samples):
         
         return [item for index, item in sorted(enumerate(samples), key = lambda x: word_counts[x[0]], reverse=True)]
     
-
 
 def sort_samples(samples):
     return list(dict.fromkeys(sorted(samples,key=len,reverse=True)))

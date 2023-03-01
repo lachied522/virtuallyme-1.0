@@ -2,7 +2,7 @@ gunicorn
 Flask
 Flask-SQLAlchemy
 SQLAlchemy
-psycopg2
 openai
+scikit-learn
 google-api-python-client
 beautifulsoup4
