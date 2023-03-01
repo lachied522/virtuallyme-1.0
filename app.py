@@ -20,7 +20,7 @@ class User(db.Model):
     name = db.Column(db.String(100))
     about = db.Column(db.Text)
     description = db.Column(db.Text)
-    monthly_words = db.Column(db.Integer)
+    words = db.Column(db.Integer)
     jobs = db.relationship('Job', backref='user', lazy='joined')
     tasks = db.relationship('Task', backref='user', lazy='joined')
 
@@ -54,7 +54,7 @@ class Data(db.Model):
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'user, Access-Control-Allow-Headers, Access-Control-Request-Headers, Origin, Accept, Content-Type'
+    response.headers['Access-Control-Allow-Headers'] = 'member_id, Access-Control-Allow-Headers, Access-Control-Request-Headers, Origin, Accept, Content-Type'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     return response
 
@@ -66,7 +66,7 @@ def create_user():
     :param member_id: user's Memberstack ID
     :param name: user's first name    
     """
-    user = User(id = request.json["member_id"], name = request.json["name"], monthly_words = 0)
+    user = User(id = request.json["member_id"], name = request.json["name"], words = 0)
     db.session.add(user)
     db.session.commit()
     return Response(status=200)
@@ -78,18 +78,19 @@ def get_user():
 
     :param member_id: user's Memberstack ID
     """
-    user = User.query.get(request.headers["member_id"])
+    user = User.query.get(request.headers.get("member_id"))
     
     user_jobs = []
-    
+
     for job in user.jobs:
         job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
         user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
 
-    user_tasks = [{"prompt": task.prompt, "completion": task.completion} for task in user.tasks if task.category=="task"]
-    user_ideas = [{"prompt": task.prompt, "completion": task.completion} for task in user.tasks if task.category=="idea"]
+    user_tasks = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="task"]
+    user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
 
     response_dict = {
+        "words": user.words,
         "user": user_jobs,
         "tasks": user_tasks[::-1],
         "ideas": user_ideas[::-1]
@@ -109,12 +110,14 @@ def create_job():
     job = Job(name=request.json["job_name"], word_count=0, user_id=user.id)
     db.session.add(job)
     db.session.commit()
-    return Response(status=200)
+
+    #return new job ID
+    return Response(json.dumps({"job_id": job.id}), status=200)
 
 @app.route("/sync_job", methods=["POST"])
 def sync_job():
     """
-    Called when user has made changes to samples data.
+    Called when user has made changes to job data.
 
     :param member_id: user's Memberstack ID
     :param job_id: job that the changes have been made for
@@ -241,10 +244,10 @@ def handle_task():
     task = Task(prompt = f"Write a {category} about {topic}.", completion = completion, category="task", user_id=user.id)
     db.session.add(task)
     #update word count
-    user.monthly_words += len(completion.split())
+    user.words += len(completion.split())
     db.session.commit()
 
-    return json.dumps({"completion": completion})
+    return Response(json.dumps({"completion": completion}), status=200)
 
 @app.route("/handle_rewrite", methods=["GET", "POST"])
 def handle_rewrite():
@@ -302,11 +305,11 @@ def handle_rewrite():
     rewrite = Task(prompt = text[:200], completion = completion, category="rewrite", user_id=user.id)
     db.session.add(rewrite)
     #update word count
-    user.monthly_words += len(completion.split())
+    user.words += len(completion.split())
 
     db.session.commit()
 
-    return json.dumps({"completion": completion})
+    return Response(json.dumps({"completion": completion}), status=200)
 
 @app.route("/handle_idea", methods=["GET", "POST"])
 def handle_idea():
@@ -322,7 +325,7 @@ def handle_idea():
     idea = Task(prompt = f"Generate ideas for my {category} about {topic}.", completion = completion, category="idea", user_id=user.id)
     db.session.add(idea)
     #update word count
-    user.monthly_words += len(completion.split())
+    user.words += len(completion.split())
     
     db.session.commit()
 
@@ -362,13 +365,13 @@ def share_job():
     job = Job.query.get(request.json["job_id"])
 
     description = request.json["description"]
-    instructions = request.json["description"]
+    instructions = request.json["instructions"]
     access = request.json["access"]
 
     #create unique id
     u = uuid.uuid4()
 
-    dummy_user = User(id = u, name = user.name, monthly_words = 0, about = user.about, description = user.description)
+    dummy_user = User(id = u, name = user.name, words = 0, about = user.about, description = user.description)
     db.session.add(dummy_user)
     
     dummy_job = Job(name=job.name, word_count=0, user_id=dummy_user.id)
