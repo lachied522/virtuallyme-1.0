@@ -22,7 +22,7 @@ class User(db.Model):
     name = db.Column(db.String(100))
     about = db.Column(db.Text)
     description = db.Column(db.Text)
-    words = db.Column(db.Integer)
+    monthly_words = db.Column(db.Integer)
     jobs = db.relationship('Job', backref='user', lazy='joined')
     tasks = db.relationship('Task', backref='user', lazy='joined')
 
@@ -68,7 +68,7 @@ def create_user():
     :param member_id: user's Memberstack ID
     :param name: user's first name    
     """
-    user = User(id = request.json["member_id"], name = request.json["name"], words = 0)
+    user = User(id = request.json["member_id"], name = request.json["name"], monthly_words = 0)
     db.session.add(user)
     db.session.commit()
     return Response(status=200)
@@ -92,7 +92,7 @@ def get_user():
     user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
 
     response_dict = {
-        "words": user.words,
+        "words": user.monthly_words,
         "user": user_jobs,
         "tasks": user_tasks[::-1],
         "ideas": user_ideas[::-1]
@@ -246,7 +246,7 @@ def handle_task():
     task = Task(prompt = f"Write a {category} about {topic}.", completion = completion, category="task", user_id=user.id)
     db.session.add(task)
     #update word count
-    user.words += len(completion.split())
+    user.monthly_words += len(completion.split())
     db.session.commit()
 
     return Response(json.dumps({"completion": completion}), status=200)
@@ -307,7 +307,7 @@ def handle_rewrite():
     rewrite = Task(prompt = text[:200], completion = completion, category="rewrite", user_id=user.id)
     db.session.add(rewrite)
     #update word count
-    user.words += len(completion.split())
+    user.monthly_words += len(completion.split())
 
     db.session.commit()
 
@@ -327,7 +327,7 @@ def handle_idea():
     idea = Task(prompt = f"Generate ideas for my {category} about {topic}.", completion = completion, category="idea", user_id=user.id)
     db.session.add(idea)
     #update word count
-    user.words += len(completion.split())
+    user.monthly_words += len(completion.split())
     
     db.session.commit()
 
@@ -409,7 +409,7 @@ def reset_words():
     """
     users = User.query.all()
     for user in users:
-        user.words = 0
+        user.monthly_words = 0
     
     db.session.commit()
     return Response(status=200)
