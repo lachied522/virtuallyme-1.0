@@ -18,6 +18,7 @@ function popupOpen(popupWrapper) {
     });
 
     popupWrapper.animate([
+        { opacity: '0' },
         { opacity: '1'}
       ], {
         duration: 200,
@@ -25,16 +26,16 @@ function popupOpen(popupWrapper) {
     });
   
     // set final state
-    setTimeout(() => {
-      popupWrapper.style.opacity = '1';
-      popup.style.transform = 'scale(1.0)';
-    }, 300);
+    popupWrapper.style.opacity = '1';
+    popup.style.transform = 'scale(1.0)';
+
 }
 
 function popupClose(popupWrapper) {
     const popup = popupWrapper.querySelector('.popup');
   
     popup.animate([
+      { transform: 'scale(1.0)' },
       { transform: 'scale(0.6)' }
     ], {
       duration: 300,
@@ -42,6 +43,7 @@ function popupClose(popupWrapper) {
     });
 
     popupWrapper.animate([
+        { opacity: '1' },
         { opacity: '0' }
       ], {
         duration: 200,
@@ -49,11 +51,10 @@ function popupClose(popupWrapper) {
     });
     
     // set final state
-    setTimeout(() => {
-      popupWrapper.style.display = 'none';
-      popupWrapper.style.opacity = '0';
-      popup.style.transform = 'scale(0.6)';
-    }, 300);
+    popupWrapper.style.display = 'none';
+    popupWrapper.style.opacity = '0';
+    popup.style.transform = 'scale(0.6)';
+
 }
 
 function removeSampleConfirm(sampleWrapper){

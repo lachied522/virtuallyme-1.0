@@ -1,14 +1,3 @@
-/////remove this/////
-const member = "mem_clddu2lex00ia0siu1xcb0jmm";
-const userName = "Lachie";
-const jobMaxWords = 10000;
-const maxJobs = 5;
-const userMonthlyWords = 10000;
-
-let userWordCount = 0;
-let userJobs = [];
-//////////////////////
-
 import * as animations from "./animations.js"
 
 function typeWriter(element, text){
@@ -45,7 +34,7 @@ function updateUserWords(value){
 
 function newJob(jobName){
     let index = userJobs.length;
-    let jobElement = jobContainers[index];
+    let jobElement = document.querySelectorAll("[customID='job-container']")[index];
     //add job to job lists
     userJobs.push(jobName);
     //add job name to job Element
@@ -61,13 +50,16 @@ function newJob(jobName){
     var jobTabButtons = document.querySelectorAll(".job-tab");
     jobTabButtons[index].style.display = "block";
     jobTabButtons[index].innerHTML = jobName;
+    //set text area resize to none prior to cloning
+    jobElement.querySelector("[customID='sample-text']").style.resize = "none";
 
     return jobElement
 }
 
 function updateJobWords(jobElement, value){
     var wordCountElement = jobElement.querySelector("[customID='job-word-count']");
-    wordCountElement.innerHTML = String(value)+"/"+String(userMonthlyWords);
+    wordCountElement.innerHTML = value.toLocaleString()+"/"+jobMaxWords.toLocaleString();
+    let samplesGrid = jobElement.querySelector(".samples-grid");
     if (value===0){
         samplesGrid.querySelector("[customID='samples-empty-text']").style.display = "block";
     } else {
@@ -76,7 +68,7 @@ function updateJobWords(jobElement, value){
 }
 
 function newSample(sampleWrapper, prompt, completion){
-    let sampleClone = sampleWrapper.cloneNode(true);
+    let sampleClone = sampleWrapper.parentElement.cloneNode(true);
     sampleClone.querySelector("[customID='sample-prompt']").innerHTML = prompt;
     sampleClone.querySelector("[customID='sample-prompt-display']").innerHTML = prompt;
     sampleClone.querySelector("[customID='sample-text']").innerHTML = completion;
@@ -85,11 +77,20 @@ function newSample(sampleWrapper, prompt, completion){
         removeSample(jobElement, sampleClone);
     });
     //cloneNode does not clone animations, must add back in
-    sampleClone.addEventListener("click", popupOpen);
-    sampleClone.querySelector(".close-button-popup-module", popupClose);
-    sampleClone.querySelector(".btn-secondary remove", removeSampleConfirm);
+    sampleClone.querySelector(".sample-wrapper").addEventListener("click", () => {
+        popupOpen(sampleClone.querySelector(".popup-wrapper"));
+    });
+    sampleClone.querySelector(".close-button-popup-module").addEventListener("click", () => {
+        popupClose(sampleClone.querySelector(".popup-wrapper"));
+    });
+    sampleClone.querySelector(".btn-secondary.remove").addEventListener("click", () => {
+        removeSampleConfirm(sampleClone);
+    });
+    sampleClone.querySelector(".btn-secondary.confirm").addEventListener("click", () => {
+        popupClose(sampleClone.querySelector(".popup-wrapper"));
+    });
 
-    sampleClone.style.display = "block";
+    sampleClone.querySelector(".sample-wrapper").style.display = "flex";
     return sampleClone
 }
 
@@ -147,8 +148,6 @@ function getUser(){
             
             let samplesGrid = newJobElement.querySelector(".samples-grid");
             let sampleWrapper = samplesGrid.querySelector(".sample-wrapper");
-            //set text area resize to none prior to cloning
-            sampleWrapper.querySelector("[customID='sample-text']").style.resize = "none";
             for(let j=0; j < data.user[i].data.length; j++){
                 let newSample = newSample(sampleWrapper, data.user[i].data[j].prompt, data.user[i].data[j].completion);
                 samplesGrid.appendChild(newSample);
@@ -225,6 +224,7 @@ function createJob() {
     .then(response => response.json())
     .then(data => {
         newJobElement.setAttribute("jobID", data.job_id);
+        updateJobWords(newJobElement, 0);
     })
     .catch(error => {
         console.error("Error loading data:", error);
@@ -237,6 +237,7 @@ function addSample(jobElement) {
     var topicElement = form.querySelector("[customInput='topic']");
     var textElement = form.querySelector("[customInput='text']");
 
+    var wordCountElement = jobElement.querySelector("[customID='job-word-count']");
     var currentWords = parseInt(wordCountElement.innerHTML.split("/")[0]);
     var newWords = textElement.value.split(" ").length;
 
@@ -257,14 +258,14 @@ function addSample(jobElement) {
     if(empty.length===0){
         let samplesGrid = jobElement.querySelector(".samples-grid");
         let sampleWrapper = samplesGrid.querySelectorAll(".sample-wrapper")[0];
-        let newSample = newSample(sampleWrapper, `Write a(n) ${typeElement.value} about ${topicElement.value}`, textElement.value)
+        let newSample = newSample(sampleWrapper, `Write a(n) ${typeElement.value} about ${topicElement.value}`, textElement.value);
         samplesGrid.appendChild(newSample);
         //reset elements (don't use form.reset())
         typeElement.value = "";
         topicElement.value = "";
         textElement.value = "";
         //increase job word count
-        updateJobWords(currentWords+newWords);
+        updateJobWords(jobElement, currentWords+newWords);
         //show save button
         jobElement.querySelector("[customID='save-button']").style.display = "flex";
         jobElement.querySelector("[customID='saved-button']").style.display = "none";
@@ -314,7 +315,7 @@ function configTask(taskWrapper){
 
 function share(jobElement){
     //call sync function first
-    //syncJob(jobNumber);
+    syncJob(jobNumber);
     const url = "http://virtuallyme.onrender.com/share_job";
 
     var form = jobElement.querySelector("[customID='share-job']");
@@ -357,16 +358,23 @@ function submitTask() {
     if(isWaiting){
         //if still waiting, do nothing
         return
+    } else if(userWordCount > userMonthlyWords){
+        document.querySelector("[customID='task-output']").textContent = "You have reached your maximum word limit for this month.\n\nUpgrade your plan to increase your limit."
+        return
     }
     const url = "http://virtuallyme.onrender.com/handle_task";
     var form = document.querySelector("[customID='submit-task']");
     var typeElement = form.querySelector("[customInput='type']");
     var topicElement = form.querySelector("[customInput='topic']");
-    //search element
+    var searchElement = form.querySelector("[customID='search-toggle']");
 
     //get ID of selected job
     var jobIndex = form.querySelector("[customID='user-job-list']").selectedIndex-1;
-    var jobID = jobContainers[jobIndex].getAttribute("jobID");
+    if(jobIndex<0||jobIndex>userJobs.length){
+        var jobID = -1
+    } else {
+        var jobID = document.querySelectorAll("[customID='job-container']")[jobIndex].getAttribute("jobID");
+    }
     //check if either typeElement or topic are missing
     var empty = [];
     if(typeElement.value===""){
@@ -382,7 +390,8 @@ function submitTask() {
         "job_id": jobID, 
         "type": typeElement.value, 
         "topic": topicElement.value, 
-        "additional": additionalElement.value
+        "additional": additionalElement.value,
+        "search": searchElement.getAttribute("on")
     };
 
     //if neither type or topic element is missing
@@ -455,6 +464,9 @@ function submitTask() {
 function generateIdeas() {
     if(isWaitingIdea){
         //if still waiting, do nothing
+        return
+    } else if(userWordCount>userMonthlyWords){
+        document.querySelector("[customID='ideas-output']").textContent = "You have reached your maximum word limit for this month.\n\nUpgrade your plan to increase your limit."
         return
     }
     const url = "http://virtuallyme.onrender.com/handle_idea";
@@ -542,14 +554,20 @@ function submitRewrite() {
     if(isWaitingRewrite){
         //if still waiting, do nothing
         return
+    } else if(userWordCount > userMonthlyWords){
+        document.querySelector("[customID='rewrite-output']").textContent = "You have reached your maximum word limit for this month.\n\nUpgrade your plan to increase your limit."
+        return
     }
     const url = "http://virtuallyme.onrender.com/handle_rewrite";
     var form = document.querySelector("[customID='submit-rewrite']");
     var textElement = form.querySelector("[customInput='text']");
     //get ID of selected job
     var jobIndex = form.querySelector("[customID='user-job-list']").selectedIndex-1;
-    var jobID = jobContainers[jobIndex].getAttribute("jobID");
-
+    if(jobIndex<0||jobIndex>userJobs.length){
+        var jobID = -1
+    } else {
+        var jobID = document.querySelectorAll("[customID='job-container']")[jobIndex].getAttribute("jobID");
+    }
     var additionalElement = form.querySelector("[customInput='additional']");
     const data = {
         "name": userName, 
@@ -598,6 +616,14 @@ function submitRewrite() {
     }      
 }
 
+function searchToggle(searchElement){
+    if(searchElement.getAttribute("on")==="true"){
+        searchElement.setAttribute("on", "false");
+    } else {
+        searchElement.setAttribute("on", "true");
+    }
+}
+
 function sendFeedback(feedback){
     const url = "http://virtuallyme.onrender.com/handle_feedback";
     //get recent task
@@ -620,10 +646,18 @@ function sendFeedback(feedback){
 }
 
 function pageLoad(){
-    getUser();    
-    var jobContainers = document.querySelectorAll("[customID='job-container']");    
-    //add functionality to jobs
-    jobContainers.forEach(jobElement => {    
+    getUser();
+    if(userJobs.length>0){
+        //hide welcome popup
+        document.querySelector(".welcome-popup").style.display = "none"; 
+    }
+    hidePreloader();
+    //add create job funcionality
+    document.querySelector("[customID='create-job-button']").addEventListener("click", ()=> {
+        createJob();
+    });
+    //add functionality to jobs 
+    document.querySelectorAll("[customID='job-container']").forEach(jobElement => {    
         jobElement.querySelector("[customID='add-button']").addEventListener("click", () => {
             addSample(jobElement);
         });
@@ -635,11 +669,17 @@ function pageLoad(){
         jobElement.querySelector("[customID='share-button']").addEventListener("click", () => {
             share(jobElement);
         });
-    })
+    });
     //add functionality to task wrappers
-    var taskWrappers = document.querySelectorAll("[customID='task-wrapper']")
-    taskWrappers.forEach(taskElement => {
-        configTask(taskWrappers);
+    document.querySelectorAll("[customID='submit-task']").forEach(taskElement => {
+        configTask(taskElement);
+    });
+    //add search toggle functionality
+    document.querySelectorAll("[customID='search-toggle']").forEach(searchElement => {
+        searchElement.addEventListener("click", () => {
+            searchToggle(searchElement);
+        });
+        searchElement.setAttribute("on", "false");
     });
     //add feedback button functionality
     document.querySelector("[customID='positive-feedback-button']").addEventListener("click", function() {

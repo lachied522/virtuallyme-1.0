@@ -1,5 +1,6 @@
 from flask import Flask, Response, request
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 
 import json
 import uuid
@@ -14,6 +15,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+CORS(app)
 
 class User(db.Model):
     id = db.Column(db.String(100), primary_key=True) #get from Memberstack
@@ -188,7 +190,7 @@ def handle_task():
     topic = request.json["topic"]
     additional = request.json["type"]
 
-    if request.json["search"]:
+    if bool(request.json["search"]):
         search_result = search_web(topic)
     else:
         search_result = {"result": ""}
@@ -227,7 +229,7 @@ def handle_task():
                 prompt += "That didn't sound like me. "
 
     #add current prompt
-    if request.json["search"] and search_result["result"] != "":
+    if bool(request.json["search"]) and search_result["result"] != "":
         context = search_result["result"]
         #if web search was successful, include results in the prompt
         prompt += f"Write a {category} about {topic}. {additional}. You may include the following information: {context}\nAI: "
@@ -236,7 +238,7 @@ def handle_task():
     
     completion = openai_call(prompt, 1000, 0.9, 0.6)
 
-    if request.json["search"] and search_result["result"] != "":
+    if bool(request.json["search"]) and search_result["result"] != "":
         #if web search was successful, return the source
         completion += "\nSource: " + str(search_result["url"])
 
@@ -400,6 +402,17 @@ def share_job():
     db.session.commit()
     return Response(status=200)
 
+@app.route("/reset_monthly_words", methods=["GET"])
+def reset_words():
+    """
+    Called at start of new month to reset user word counts.
+    """
+    users = User.query.all()
+    for user in users:
+        user.words = 0
+    
+    db.session.commit()
+    return Response(status=200)
 
 if __name__ == "__main__":
     app.run()
