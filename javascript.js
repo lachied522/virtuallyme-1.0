@@ -58,7 +58,7 @@ function newJob(jobName){
 
 function updateJobWords(jobElement, value){
     var wordCountElement = jobElement.querySelector("[customID='job-word-count']");
-    wordCountElement.innerHTML = value.toLocaleString()+"/"+jobMaxWords.toLocaleString();
+    wordCountElement.innerHTML = value+"/"+jobMaxWords.toLocaleString();
     let samplesGrid = jobElement.querySelector(".samples-grid");
     if (value===0){
         samplesGrid.querySelector("[customID='samples-empty-text']").style.display = "block";
@@ -67,7 +67,7 @@ function updateJobWords(jobElement, value){
     }
 }
 
-function newSample(sampleWrapper, prompt, completion){
+function newSample(jobElement, sampleWrapper, prompt, completion){
     let sampleClone = sampleWrapper.parentElement.cloneNode(true);
     sampleClone.querySelector("[customID='sample-prompt']").innerHTML = prompt;
     sampleClone.querySelector("[customID='sample-prompt-display']").innerHTML = prompt;
@@ -95,7 +95,7 @@ function newSample(sampleWrapper, prompt, completion){
 }
 
 function getUser(){
-    const url = "http://virtuallyme.onrender.com/get_user";
+    const url = "https://virtuallyme.onrender.com/get_user";
 
     fetch(url, {
         method: "GET",
@@ -149,10 +149,9 @@ function getUser(){
             let samplesGrid = newJobElement.querySelector(".samples-grid");
             let sampleWrapper = samplesGrid.querySelector(".sample-wrapper");
             for(let j=0; j < data.user[i].data.length; j++){
-                let newSample = newSample(sampleWrapper, data.user[i].data[j].prompt, data.user[i].data[j].completion);
-                samplesGrid.appendChild(newSample);
+                samplesGrid.appendChild(newSample(newJobElement, sampleWrapper, data.user[i].data[j].prompt, data.user[i].data[j].completion));
             }
-            updateJobWords(newJobElement, data.user.word_count);
+            updateJobWords(newJobElement, data.user[i].word_count);
         }
     })
     .catch(error => {
@@ -161,7 +160,7 @@ function getUser(){
 }
 
 function syncJob(jobElement) {
-    const url = "http://virtuallyme.onrender.com/sync_job";
+    const url = "https://virtuallyme.onrender.com/sync_job";
 
     var samplePrompts = jobElement.querySelectorAll("[customID='sample-prompt']");
     var sampleTexts = jobElement.querySelectorAll("[customID='sample-text']");
@@ -206,7 +205,7 @@ function createJob() {
         //max jobs
         return
     } 
-    const url = "http://virtuallyme.onrender.com/create_job"
+    const url = "https://virtuallyme.onrender.com/create_job"
 
     var form = document.querySelector("[customID='create-new-job']");
     newJobName = form.querySelector("[customInput='new-job-name']").value;
@@ -258,8 +257,7 @@ function addSample(jobElement) {
     if(empty.length===0){
         let samplesGrid = jobElement.querySelector(".samples-grid");
         let sampleWrapper = samplesGrid.querySelectorAll(".sample-wrapper")[0];
-        let newSample = newSample(sampleWrapper, `Write a(n) ${typeElement.value} about ${topicElement.value}`, textElement.value);
-        samplesGrid.appendChild(newSample);
+        samplesGrid.appendChild(newSample(jobElement, sampleWrapper, `Write a(n) ${typeElement.value} about ${topicElement.value}`, textElement.value));
         //reset elements (don't use form.reset())
         typeElement.value = "";
         topicElement.value = "";
@@ -316,7 +314,7 @@ function configTask(taskWrapper){
 function share(jobElement){
     //call sync function first
     syncJob(jobNumber);
-    const url = "http://virtuallyme.onrender.com/share_job";
+    const url = "https://virtuallyme.onrender.com/share_job";
 
     var form = jobElement.querySelector("[customID='share-job']");
 
@@ -339,7 +337,7 @@ function share(jobElement){
 
 /////####################////////////
 function removeSharedJob(id){
-    const url = "https://eotb00w2hzgv89k.m.pipedream.net";
+    const url = "httpss://eotb00w2hzgv89k.m.pipedream.net";
 
     var body = {
         "id": id
@@ -362,7 +360,7 @@ function submitTask() {
         document.querySelector("[customID='task-output']").textContent = "You have reached your maximum word limit for this month.\n\nUpgrade your plan to increase your limit."
         return
     }
-    const url = "http://virtuallyme.onrender.com/handle_task";
+    const url = "https://virtuallyme.onrender.com/handle_task";
     var form = document.querySelector("[customID='submit-task']");
     var typeElement = form.querySelector("[customInput='type']");
     var topicElement = form.querySelector("[customInput='topic']");
@@ -469,7 +467,7 @@ function generateIdeas() {
         document.querySelector("[customID='ideas-output']").textContent = "You have reached your maximum word limit for this month.\n\nUpgrade your plan to increase your limit."
         return
     }
-    const url = "http://virtuallyme.onrender.com/handle_idea";
+    const url = "https://virtuallyme.onrender.com/handle_idea";
     var form = document.querySelector("[customID='ideas-form']");
     var typeElement = form.querySelector("[customInput='type']");
     var topicElement = form.querySelector("[customInput='topic']");
@@ -558,7 +556,7 @@ function submitRewrite() {
         document.querySelector("[customID='rewrite-output']").textContent = "You have reached your maximum word limit for this month.\n\nUpgrade your plan to increase your limit."
         return
     }
-    const url = "http://virtuallyme.onrender.com/handle_rewrite";
+    const url = "https://virtuallyme.onrender.com/handle_rewrite";
     var form = document.querySelector("[customID='submit-rewrite']");
     var textElement = form.querySelector("[customInput='text']");
     //get ID of selected job
@@ -625,7 +623,7 @@ function searchToggle(searchElement){
 }
 
 function sendFeedback(feedback){
-    const url = "http://virtuallyme.onrender.com/handle_feedback";
+    const url = "https://virtuallyme.onrender.com/handle_feedback";
     //get recent task
     var recentTasksContainer = document.querySelector("[customID='recent-tasks']");
     var prompt = recentTasksContainer.querySelectorAll("[customID='tasks-header']")[0].innerHTML;
