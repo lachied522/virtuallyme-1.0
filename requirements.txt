@@ -2,6 +2,7 @@ gunicorn
 psycopg2
 Flask
 Flask-SQLAlchemy
+flask-cors
 SQLAlchemy
 openai
 scikit-learn
