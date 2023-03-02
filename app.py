@@ -92,7 +92,7 @@ def get_user():
     user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
 
     response_dict = {
-        "words": user.monthly_words,
+        "words": user.monthly_words or 0,
         "user": user_jobs,
         "tasks": user_tasks[::-1],
         "ideas": user_ideas[::-1]
@@ -185,21 +185,23 @@ def handle_task():
     :param search: bool, specifies whether to search the web
     """
     user = User.query.get(request.json["member_id"])
+    job_id = int(request.json["job_id"])
 
     category = request.json["type"]
     topic = request.json["topic"]
     additional = request.json["type"]
+    search = request.json["search"]=="true"
 
-    if bool(request.json["search"]):
+    if search:
         search_result = search_web(topic)
     else:
         search_result = {"result": ""}
 
-    if request.json["job_id"] == -1:
+    if job_id == -1:
         #combine all job data
         samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
-    elif request.json["job_id"] > 0:
-        job = Job.query.get(request.json["job_id"])
+    elif job_id > 0:
+        job = Job.query.get(job_id)
         #get job data
         samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for d in job.data]
     else:
@@ -229,7 +231,7 @@ def handle_task():
                 prompt += "That didn't sound like me. "
 
     #add current prompt
-    if bool(request.json["search"]) and search_result["result"] != "":
+    if search and search_result["result"] != "":
         context = search_result["result"]
         #if web search was successful, include results in the prompt
         prompt += f"Write a {category} about {topic}. {additional}. You may include the following information: {context}\nAI: "
@@ -238,7 +240,7 @@ def handle_task():
     
     completion = openai_call(prompt, 1000, 0.9, 0.6)
 
-    if bool(request.json["search"]) and search_result["result"] != "":
+    if search and search_result["result"] != "":
         #if web search was successful, return the source
         completion += "\nSource: " + str(search_result["url"])
 
@@ -260,15 +262,16 @@ def handle_rewrite():
     :param additional: string, additional information user might provide
     """
     user = User.query.get(request.json["member_id"])
+    job_id = int(request.json["job_id"])
 
     text = request.json["text"]
     additional = request.json["additional"]
 
-    if request.json["job_id"] == -1:
+    if job_id == -1:
         #combine all job data
         samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
-    elif request.json["job_id"] > 0:
-        job = Job.query.get(request.json["job_id"])
+    elif job_id > 0:
+        job = Job.query.get(job_id)
         #get job data
         samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for d in job.data]
     else:
@@ -335,8 +338,9 @@ def handle_idea():
 
 @app.route("/handle_feedback", methods=["GET", "POST"])
 def handle_feedback():
-    if request.json["job_id"] > 0:
-        job = Job.query.get(request.json["job_id"])
+    job_id = int(request.json["job_id"])
+    if job_id > 0:
+        job = Job.query.get(job_id)
         prompt = request.json["prompt"]
         completion = request.json["completion"]
         feedback = request.json["feedback"]
@@ -364,7 +368,7 @@ def share_job():
     """
     #create a dummy user to store job data
     user = User.query.get(request.json["member_id"])
-    job = Job.query.get(request.json["job_id"])
+    job = Job.query.get(int(request.json["job_id"]))
 
     description = request.json["description"]
     instructions = request.json["instructions"]

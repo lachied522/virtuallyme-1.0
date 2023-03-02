@@ -58,7 +58,7 @@ function popupClose(popupWrapper) {
 }
 
 function removeSampleConfirm(sampleWrapper){
-    sampleWrapper.querySelector(".btn-secondary remove").style.display = 'none';
-    sampleWrapper.querySelector(".btn-secondary confirm").style.display = 'flex';
+    sampleWrapper.querySelector(".btn-secondary.remove").style.display = 'none';
+    sampleWrapper.querySelector(".btn-secondary.confirm").style.display = 'flex';
     sampleWrapper.querySelector(".text-200").style.display = 'block';
 }
