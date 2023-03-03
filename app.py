@@ -151,7 +151,7 @@ def sync_job():
 
     #only consider first 8,000 characters ~ 2000 words
     if len(all_samples_str.split()) > 300 and all_samples_str!=existing_samples_str:
-        prompt = f"Pretend the following text was written by you.\nText: {all_samples_str}\nUsing a minimum of 100 words, give an elaborate description of your writing style, including a description of your audience, semantics, syntax, and sentence structure. Speak in first person."
+        prompt = f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of your writing style, including a description of your audience, semantics, syntax, and sentence structure. Speak in first person."
         description = openai_call(prompt, 500, 0.4, 0.3)
         #update user description
         user.description = description
@@ -377,7 +377,7 @@ def share_job():
     #create unique id
     u = uuid.uuid4()
 
-    dummy_user = User(id = u, name = user.name, words = 0, about = user.about, description = user.description)
+    dummy_user = User(id = u, name = user.name, monthly_words = 0, about = user.about, description = user.description)
     db.session.add(dummy_user)
     
     dummy_job = Job(name=job.name, word_count=0, user_id=dummy_user.id)
