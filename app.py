@@ -150,7 +150,7 @@ def sync_job():
     existing_samples_str = str("\n".join(sort_samples(existing_samples)))[:8000]
 
     #only consider first 8,000 characters ~ 2000 words
-    if len(all_samples_str.split()) > 300 and all_samples_str==existing_samples_str:
+    if len(all_samples_str.split()) > 300 and all_samples_str!=existing_samples_str:
         prompt = f"Pretend the following text was written by you.\nText: {all_samples_str}\nUsing a minimum of 100 words, give an elaborate description of your writing style, including a description of your audience, semantics, syntax, and sentence structure. Speak in first person."
         description = openai_call(prompt, 500, 0.4, 0.3)
         #update user description
