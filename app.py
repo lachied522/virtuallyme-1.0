@@ -83,10 +83,12 @@ def get_user():
     user = User.query.get(request.headers.get("member_id"))
     
     user_jobs = []
-
     for job in user.jobs:
-        job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
-        user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
+        try:
+            job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
+            user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
+        except:
+            print("Could not load job data")
 
     user_tasks = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="task"]
     user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
@@ -125,10 +127,15 @@ def sync_job():
 
     :param member_id: user's Memberstack ID
     :param job_id: job that the changes have been made for
+    :param job_name: job name
     :param data: list of dicts containing prompt, completion pairs
     """
     user = User.query.get(request.json["member_id"])
-    job = Job.query.get(request.json["job_id"])
+    try:
+        job = Job.query.get(request.json["job_id"])
+    except:
+        job = Job(name=request.json["job_name"], word_count=0, user_id=user.id)
+        db.session.add(job)
     
     new_data = request.json["data"]
     #delete existing data belonging to job
@@ -164,7 +171,6 @@ def sync_job():
             "webflow_member_ID": user.id,
             "description": description
         }
-
         response = requests.post(url, data=json.dumps(response_dictionary))
 
     #update user record
@@ -252,7 +258,6 @@ def handle_task():
     #update word count
     user.monthly_words += len(completion.split())
     db.session.commit()
-
     return Response(json.dumps({"completion": completion}), status=200)
 
 @app.route("/handle_rewrite", methods=["GET", "POST"])
@@ -309,12 +314,12 @@ def handle_rewrite():
     completion = openai_call(prompt, 1000, 0.9, 0.6)
 
     #store rewrite data    
-    rewrite = Task(prompt = text[:200], completion = completion, category="rewrite", user_id=user.id)
+    rewrite = Task(prompt = text[:100], completion = completion, category="rewrite", user_id=user.id)
     db.session.add(rewrite)
     #update word count
     user.monthly_words += len(completion.split())
     db.session.commit()
-    
+
     return Response(json.dumps({"completion": completion}), status=200)
 
 @app.route("/handle_idea", methods=["GET", "POST"])

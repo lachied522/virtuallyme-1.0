@@ -94,6 +94,30 @@ function newSample(jobElement, sampleWrapper, prompt, completion){
     return sampleClone
 }
 
+function storeTask(tasksContainer, prompt, completion){
+    let modules = tasksContainer.querySelectorAll(".module");
+    let taskHeaders = tasksContainer.querySelectorAll("[customID='tasks-header']");
+    let taskBodies = tasksContainer.querySelectorAll("[customID='tasks-body']");
+    if(taskBodies[0].innerHTML.trim()===""){
+        //if no existing tasks
+        tasksContainer.querySelector("[customID='empty-text']").style.display = "none";
+        modules[0].style.display = "block";
+    } else {
+        //move tasks list
+        for(let i=taskBodies.length-1; i > 0; i--){
+            taskBodies[i].innerHTML = taskBodies[i-1].innerHTML;
+            taskHeaders[i].innerHTML = taskHeaders[i-1].innerHTML;
+            if(taskBodies[i].innerHTML.trim()!==""){
+                //show the module if non-empty
+                modules[i].style.display = "block";
+            }
+        }
+    }
+    //set first task to the one just completed
+    taskHeaders[0].innerHTML = prompt;
+    taskBodies[0].innerHTML = completion;
+}
+
 function getUser(){
     const url = "https://virtuallyme.onrender.com/get_user";
 
@@ -107,36 +131,16 @@ function getUser(){
     .then(response => response.json())
     .then(data => {
         //store task data
-        var recentTasksContainer = document.querySelector("#recent-tasks");
-        var taskModules = recentTasksContainer.querySelectorAll(".module");
-        var taskHeaders = recentTasksContainer.querySelectorAll("[customID='tasks-header']");
-        var taskBodies = recentTasksContainer.querySelectorAll("[customID='tasks-body']");
         for(let i = 0; i < data.tasks.length; i++){
-            taskBodies[i].innerHTML = data.tasks[i].completion;
-            taskHeaders[i].innerHTML = data.tasks[i].prompt;
-            if(taskBodies[i].innerHTML !== ""){
-                //show the module if non-empty
-                taskModules[i].style.display = "block";
-            }
-        }
-        if(taskBodies[0].innerHTML !== ""){
-            document.querySelector("#tasks-empty-text").style.display = "none";
+            storeTask(document.querySelector("#recent-tasks"), data.tasks[i].prompt, data.tasks[i].completion);
         }
         //store ideas data
-        var recentIdeasContainer = document.querySelector("#recent-ideas");
-        var ideaModules = recentIdeasContainer.querySelectorAll(".module");
-        var ideaHeaders = recentIdeasContainer.querySelectorAll("[customID='ideas-header']");
-        var ideaBodies = recentIdeasContainer.querySelectorAll("[customID='ideas-body']");
         for(let i=0; i < data.ideas.length; i++){
-            ideaBodies[i].innerHTML = data.ideas[i].completion;
-            ideaHeaders[i].innerHTML = data.ideas[i].prompt;
-            if(ideaBodies[i].innerHTML !== ""){
-                //show the module if non-empty
-                ideaModules[i].style.display = "block";
-            }
+            storeTask(document.querySelector("#recent-ideas"), data.ideas[i].prompt, data.ideas[i].completion);
         }
-        if(ideaBodies[0].innerHTML !== ""){
-            document.querySelector("#ideas-empty-text").style.display = "none";
+        //store rewrite data
+        for(let i = 0; i < data.rewrites.length; i++){
+            storeTask(document.querySelector("#recent-rewrites"), data.rewrites[i].prompt, data.rewrites[i].completion);
         }
         //update user word count
         updateUserWords(data.words);
@@ -211,7 +215,9 @@ function createJob() {
     newJobName = form.querySelector("[customInput='new-job-name']").value;
 
     var newJobElement = newJob(newJobName);
-    //reset new job form
+    newJobElement.setAttribute("jobID", -1);
+    updateJobWords(newJobElement, 0);
+
     form.reset();
     fetch(url, {
         method: "POST",
@@ -223,7 +229,6 @@ function createJob() {
     .then(response => response.json())
     .then(data => {
         newJobElement.setAttribute("jobID", data.job_id);
-        updateJobWords(newJobElement, 0);
     })
     .catch(error => {
         console.error("Error loading data:", error);
@@ -398,10 +403,8 @@ function submitTask() {
         waiting(destination);
         isWaiting = true;
         //reset feedback bar
-        var feedbackBar = document.querySelector(".feedback-bar");
-        feedbackBar.style.display = "flex";
-        var feedbackText = document.querySelector(".feedback-text");
-        feedbackText.style.display = "none";
+        document.querySelector(".feedback-bar").style.display = "flex";
+        document.querySelector(".feedback-text").style.display = "none";
         fetch(url, {
             method: "POST",
             body: JSON.stringify(data),
@@ -421,27 +424,7 @@ function submitTask() {
             updateUserWords(userWordCount+words);
             //update tasks list
             var recentTasksContainer = document.querySelector("#recent-tasks");
-            var modules = recentTasksContainer.querySelectorAll(".module");
-            var taskHeaders = recentTasksContainer.querySelectorAll("[customID='tasks-header']");
-            var taskBodies = recentTasksContainer.querySelectorAll("[customID='tasks-body']");
-            //if no existing tasks
-            if(taskBodies[0].innerHTML === ""){
-                document.querySelector("#tasks-empty-text").style.display = "none";
-                modules[0].style.display = "block";
-            } else {
-                //move tasks list
-                for(let i=taskBodies.length-1; i > 0; i--){
-                    taskBodies[i].innerHTML = taskBodies[i-1].innerHTML;
-                    taskHeaders[i].innerHTML = taskHeaders[i-1].innerHTML;
-                    if(taskBodies[i].innerHTML !== ""){
-                        //show the module if non-empty
-                        modules[i].style.display = "block";
-                    }
-                }
-            }
-            //set first task to the one just completed
-            taskHeaders[0].innerHTML = `Write a(n) ${typeElement.value} about ${topicElement.value}`;
-            taskBodies[0].innerHTML = data.completion;
+            storeTask(recentTasksContainer, `Write a(n) ${typeElement.value} about ${topicElement.value}`, data.completion);
         })
         .catch(error => {
             isWaiting = false;
@@ -507,30 +490,9 @@ function generateIdeas() {
             document.querySelector("[customID='idea-word-count']").innerHTML = `Word count: ${words}`;
             //update user word count
             updateUserWords(userWordCount+words);
-            //update tasks list
+            //update ideas list
             var recentIdeasContainer = document.querySelector("#recent-ideas");
-            var modules = recentIdeasContainer.querySelectorAll(".module");
-            var ideaHeaders = recentIdeasContainer.querySelectorAll("[customID='ideas-header']");
-            var ideaBodies = recentIdeasContainer.querySelectorAll("[customID='ideas-body']");
-            //if no existing tasks
-            if(ideaBodies[0].innerHTML === ""){
-                document.querySelector("#ideas-empty-text").style.display = "none";
-                modules[0].style.display = "block";
-            } else {
-                //move tasks list
-                for(let i=ideaBodies.length-1; i > 0; i--){
-                    ideaBodies[i].innerHTML = ideaBodies[i-1].innerHTML;
-                    ideaHeaders[i].innerHTML = ideaHeaders[i-1].innerHTML;
-                    if(ideaBodies[i].innerHTML !== ""){
-                        //show the module if non-empty
-                        modules[i].style.display = "block";
-                    }
-                }
-            }
-            //set first task to the one just completed
-            ideaHeaders[0].innerHTML = `Generate content ideas for my ${data.completion}`;
-            ideaBodies[0].innerHTML = data.completion;
-            
+            storeTask(recentIdeasContainer, `Generate content ideas for my ${typeElement.value}`, data.completion);
         })
         .catch(error => {
             isWaitingIdea = false;
@@ -597,6 +559,9 @@ function submitRewrite() {
             document.querySelector("[customID='rewrite-word-count']").innerHTML = `Word count: ${words}`;
             //update user word count
             updateUserWords(userWordCount+words);
+            //update rewrites list
+            var rewritesContainer = document.querySelector("#recent-rewrites");
+            storeTask(rewritesContainer, `Rewrite ${textElement.value.slice(0, 100)}`, data.completion);
         })
         .catch(error => {
             isWaitingRewrite = false;
