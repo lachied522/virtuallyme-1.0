@@ -90,12 +90,14 @@ def get_user():
 
     user_tasks = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="task"]
     user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
+    user_rewrites = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="rewrite"]
 
     response_dict = {
         "words": user.monthly_words or 0,
         "user": user_jobs,
-        "tasks": user_tasks[::-1],
-        "ideas": user_ideas[::-1]
+        "tasks": user_tasks,
+        "ideas": user_ideas,
+        "rewrites": user_rewrites
     }
 
     return Response(json.dumps(response_dict), status=200)
@@ -311,9 +313,8 @@ def handle_rewrite():
     db.session.add(rewrite)
     #update word count
     user.monthly_words += len(completion.split())
-
     db.session.commit()
-
+    
     return Response(json.dumps({"completion": completion}), status=200)
 
 @app.route("/handle_idea", methods=["GET", "POST"])
@@ -353,14 +354,13 @@ def handle_feedback():
     
     return Response(status=200)
 
-
 @app.route("/share_job", methods=["POST"])
 def share_job():
     """
     Creates dummy user and job for others to use.
 
     :param member_id: user's Memberstack ID
-    :param job_id: job that the changes have been made for
+    :param job_id: job to be shared
 
     :param description: string, job description
     :param instructions: string, job instructions
@@ -405,6 +405,38 @@ def share_job():
 
     db.session.commit()
     return Response(status=200)
+
+@app.route("/remove_shared_job", methods=["POST"])
+def remove_job():
+    """
+    Removes shared job from database.
+
+    :param member_id: member that job belonds to
+    :param job_id: job to be removed
+    """
+    job_id = request.json["job_id"]
+    #job id is ssame as user id for shared job
+    dummy_user = User.query.get(job_id)
+    dummy_job = Job.query.get(job_id)
+    
+    for d in dummy_job.data:
+        db.session.delete(d)
+    
+    db.session.delete(dummy_job)
+    db.session.delete(dummy_user)
+
+    url = "https://hooks.zapier.com/hooks/catch/14316057/3budn3o/"
+
+    data = {
+        "member": request.json["member_id"],
+        "id": job_id
+    }
+
+    response = requests.post(url, data=json.dumps(data))
+
+    db.session.commit()
+    return Response(status=200)
+
 
 @app.route("/reset_monthly_words", methods=["GET"])
 def reset_words():
