@@ -5,6 +5,7 @@ Flask-SQLAlchemy
 flask-cors
 SQLAlchemy
 openai
+asyncio
 scikit-learn
 google-api-python-client
 beautifulsoup4

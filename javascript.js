@@ -89,6 +89,9 @@ function newSample(jobElement, sampleWrapper, prompt, completion){
     sampleClone.querySelector(".btn-secondary.confirm").addEventListener("click", () => {
         popupClose(sampleClone.querySelector(".popup-wrapper"));
     });
+    sampleClone.querySelector(".btn-secondary.green").addEventListener("click", () => {
+        popupClose(sampleClone.querySelector(".popup-wrapper"));
+    });
 
     sampleClone.querySelector(".sample-wrapper").style.display = "flex";
     return sampleClone
@@ -156,10 +159,14 @@ function getUser(){
                 samplesGrid.appendChild(newSample(newJobElement, sampleWrapper, data.user[i].data[j].prompt, data.user[i].data[j].completion));
             }
             updateJobWords(newJobElement, data.user[i].word_count);
+            newJobElement.setAttribute("saved", "true");
         }
     })
     .catch(error => {
         console.log(error);
+        setTimeout(() => {
+            getUser();
+        }, 1);
     })
 }
 
@@ -168,6 +175,13 @@ function syncJob(jobElement) {
 
     var samplePrompts = jobElement.querySelectorAll("[customID='sample-prompt']");
     var sampleTexts = jobElement.querySelectorAll("[customID='sample-text']");
+
+    let saveButton = jobElement.querySelector("[customID='save-button']");
+    let savingButton = jobElement.querySelector("[customID='saving-button']");
+    let savedButton = jobElement.querySelector("[customID='saved-button']");
+
+    saveButton.style.display = "none";
+    savingButton.style.display = "flex";
 
     var body = {
         "member_id": member, 
@@ -198,9 +212,15 @@ function syncJob(jobElement) {
     .then(response => response.json())
     .then(data => {
         console.log("Success:", data);
+        savingButton.style.display = "none";
+        savedButton.style.display = "flex";
+        jobElement.setAttribute("saved", "true");
     })
     .catch(error => {
         console.error("Error loading data:", error);
+        savingButton.style.display = "none";
+        savedButton.style.display = "flex";
+        jobElement.setAttribute("saved", "false");
     });
 }
 
@@ -340,12 +360,13 @@ function share(jobElement){
     })
 }
 
-/////####################////////////
+
 function removeSharedJob(id){
-    const url = "httpss://eotb00w2hzgv89k.m.pipedream.net";
+    const url = "https://virtuallyme.onrender.com/remove_shared_job";
 
     var body = {
-        "id": id
+        "member_id": member,
+        "job_id": id
     };
 
     fetch(url, {
