@@ -131,17 +131,24 @@ def sync_job():
     :param data: list of dicts containing prompt, completion pairs
     """
     user = User.query.get(request.json["member_id"])
-    try:
-        job = Job.query.get(request.json["job_id"])
-    except:
+    if user is not None:
+        try:
+            job = Job.query.get(request.json["job_id"])
+            #delete existing data belonging to job
+            for data in [d for d in job.data if d.feedback=="user-upload"]:
+                db.session.delete(data)
+        except:
+            job = Job(name=request.json["job_name"], word_count=0, user_id=user.id)
+            db.session.add(job)
+    else:
+        user = User(id = request.json["member_id"], name = request.json["name"], monthly_words = 0)
         job = Job(name=request.json["job_name"], word_count=0, user_id=user.id)
         db.session.add(job)
-    
+        db.session.add(user)
+
+    #add new data
     new_data = request.json["data"]
-    #delete existing data belonging to job
-    for data in [d for d in job.data if d.feedback=="user-upload"]:
-        db.session.delete(data)
-    
+
     word_count = 0
     for prompt_completion in new_data:
         prompt = prompt_completion["prompt"]
@@ -195,16 +202,6 @@ def handle_task():
     user = User.query.get(request.json["member_id"])
     job_id = int(request.json["job_id"])
 
-    category = request.json["type"]
-    topic = request.json["topic"]
-    additional = request.json["type"]
-    search = request.json["search"]=="true"
-
-    if search:
-        search_result = search_web(topic)
-    else:
-        search_result = {"result": ""}
-
     if job_id == -1:
         #combine all job data
         samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
@@ -216,41 +213,31 @@ def handle_task():
         #no job data
         samples = []
     
-    #construct prompt
-    #preliminaries
-    about = user.about or ""
-    description = user.description or ""
+    category = request.json["type"]
+    topic = request.json["topic"]
+    additional = request.json["type"]
+    search = request.json["search"]=="true"
 
-    prompt = f"You are my writing assistant. You must give responses that replicate the complexity and burstiness of my writing, including my word choice, tonality, sentence structure, semantics and syntax."
-    if about != "":
-        prompt += f"\nHere is some information about me: {about}"
-    if description != "":
-        prompt += f"\nHere is a description of my writing style: {description}"
-    
-    prompt += "\nMe: "
-    for prompt_completion in rank_samples(topic, samples):
-        if len(prompt.split())+len(prompt_completion["completion"].split()) > 2250-len(additional.split())-len(description.split())-len(search_result["result"].split()):
-            ##prompt limit 3097 tokens (4097-1000 for completion)
-            ##1000 tokens ~ 750 words
-            break
-        else:
-            prompt += prompt_completion["prompt"] + "\nAI: " + prompt_completion["completion"] + "\nMe: "
-            if prompt_completion["feedback"]=="negative":
-                prompt += "That didn't sound like me. "
+    if search:
+        search_result = search_web(topic)
+    else:
+        search_result = {"result": ""}
 
-    #add current prompt
+    maxlength = 2250-len(additional.split())-len(search_result["result"].split())
+    messages = construct_messages(user, samples, maxlength, topic)
+
     if search and search_result["result"] != "":
         context = search_result["result"]
-        #if web search was successful, include results in the prompt
-        prompt += f"Write a {category} about {topic}. {additional}. You may include the following information: {context}\nAI: "
-    else:
-        prompt += f"Write a {category} about {topic}. {additional}\nAI: "
-    
-    completion = openai_call(prompt, 1000, 0.9, 0.6)
+        messages.append({"role": "system", "content": f"You may use following context to answer the next question.\nContext: {context}"})
+
+    #add current prompt
+    messages.append({"role": "user", "content": f"Using my writing style, write a {category} about {topic}. {additional}."})
+
+    completion = turbo_openai_call(messages, 1000, 0.9, 0.6)
 
     if search and search_result["result"] != "":
         #if web search was successful, return the source
-        completion += "\nSource: " + str(search_result["url"])
+        completion += "\n\nSources:\n" + "\n\n".join(search_result["urls"])
 
     #store task data    
     task = Task(prompt = f"Write a {category} about {topic}.", completion = completion, category="task", user_id=user.id)
@@ -265,14 +252,12 @@ def handle_rewrite():
     """
     :param member_id: user's Memberstack ID
     :param job_id: job that the changes have been made for
-    :param text: string, text to be rewritten
+    :param type: string, type of response to generate
+    :param topic: string, subject of response
     :param additional: string, additional information user might provide
     """
     user = User.query.get(request.json["member_id"])
     job_id = int(request.json["job_id"])
-
-    text = request.json["text"]
-    additional = request.json["additional"]
 
     if job_id == -1:
         #combine all job data
@@ -284,34 +269,17 @@ def handle_rewrite():
     else:
         #no job data
         samples = []
+
+    text = request.json["text"]
+    additional = request.json["additional"]
     
-    #construct prompt
-    #preliminaries
-    about = user.about or ""
-    description = user.description or ""
+    maxlength = 2250-len(additional.split())
+    messages = construct_messages(user, samples, maxlength, text)
 
-    prompt = f"You are my writing assistant. You must give responses replicate the complexity and burstiness of my writing, including my word choice, tonality, sentence structure, semantics and syntax."
-    if about != "":
-        prompt += f"\nHere is some information about me: {about}"
-    if description != "":
-        prompt += f"\nHere is a description of my writing style: {description}"
-    
-    prompt += "\nMe: "
-    #given no topic context, samples are simply sorted by length
-    for prompt_completion in sort_samples(samples):
-        if len(prompt.split())+len(prompt_completion["completion"].split()) > 2250-len(text.split())-len(additional.split())-len(description.split()):
-            ##prompt limit 3097 tokens (4097-1000 for completion)
-            ##1000 tokens ~ 750 words
-            break
-        else:
-            prompt += prompt_completion["prompt"] + "\nAI: " + prompt_completion["completion"] + "\nMe: "
-            if prompt_completion["feedback"]=="negative":
-                prompt += "That didn't sound like me. "
+    #add current prompt
+    messages.append({"role": "user", "content": f"Now I want you to rewrite the following text using my writing style. {additional}. Text: {text}"})
 
-
-    prompt += f"Me: Now I want you to rewrite the following text using my writing style. {additional}\nText:{text}\nAI:"
-
-    completion = openai_call(prompt, 1000, 0.9, 0.6)
+    completion = turbo_openai_call(messages, 1000, 0.9, 0.6)
 
     #store rewrite data    
     rewrite = Task(prompt = text[:100], completion = completion, category="rewrite", user_id=user.id)
@@ -324,13 +292,22 @@ def handle_rewrite():
 
 @app.route("/handle_idea", methods=["GET", "POST"])
 def handle_idea():
+    """
+    :param member_id: user's Memberstack ID
+    :param job_id: job that the changes have been made for
+    :param text: string, text to be rewritten
+    :param additional: string, additional information user might provide
+    """
     user = User.query.get(request.json["member_id"])
     category = request.json["type"]
     topic = request.json["topic"]
 
-    prompt = f"Generate ideas for my {category} about {topic}. Elaborate on each idea by providing specific examples of what content to include."
+    message = [{
+        "role": "user", 
+        "content": f"Generate ideas for my {category} about {topic}. Elaborate on each idea by providing specific examples of what content to include."
+    }]
 
-    completion = openai_call(prompt, 600, 0.3, 0.2)
+    completion = turbo_openai_call(message, 600, 0.3, 0.2)
 
     #store idea data
     idea = Task(prompt = f"Generate ideas for my {category} about {topic}.", completion = completion, category="idea", user_id=user.id)
@@ -420,7 +397,7 @@ def remove_job():
     :param job_id: job to be removed
     """
     job_id = request.json["job_id"]
-    #job id is ssame as user id for shared job
+    #job id is same as user id for shared job
     dummy_user = User.query.get(job_id)
     dummy_job = Job.query.get(job_id)
     
