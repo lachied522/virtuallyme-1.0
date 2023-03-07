@@ -57,13 +57,14 @@ function newJob(jobName){
 }
 
 function updateJobWords(jobElement, value){
-    var wordCountElement = jobElement.querySelector("[customID='job-word-count']");
-    wordCountElement.innerHTML = value+"/"+jobMaxWords.toLocaleString();
-    let samplesGrid = jobElement.querySelector(".samples-grid");
-    if (value===0){
-        samplesGrid.querySelector("[customID='samples-empty-text']").style.display = "block";
+    let wordCountElement = jobElement.querySelector("[customID='job-word-count']");
+    
+    if(value<=0){
+        wordCountElement.innerHTML = "0/"+jobMaxWords.toLocaleString();
+        jobElement.querySelector("[customID='samples-empty-text']").style.display = "block";
     } else {
-        samplesGrid.querySelector("[customID='samples-empty-text']").style.display = "none";
+        wordCountElement.innerHTML = value+"/"+jobMaxWords.toLocaleString();
+        jobElement.querySelector("[customID='samples-empty-text']").style.display = "none";
     }
 }
 
@@ -166,7 +167,7 @@ function getUser(){
         console.log(error);
         setTimeout(() => {
             getUser();
-        }, 1);
+        }, 3);
     })
 }
 
@@ -311,6 +312,15 @@ function removeSample(jobElement, sampleWrapper){
     updateJobWords(jobElement, currentWords-sampleWords);
 }
 
+function removeJob(jobElement){
+    jobElement.querySelectorAll(".sample-wrapper").forEach(sampleWrapper => {
+        if(sampleWrapper.querySelector("[customID='sample-text']").value.trim()!=""){
+            removeSample(jobElement, sampleWrapper);
+        }
+        
+    })
+}
+
 function configTask(taskWrapper){
     textareas = taskWrapper.querySelectorAll("textarea");
     textareas.forEach(textarea => {
@@ -420,6 +430,7 @@ function submitTask() {
 
     //if neither type or topic element is missing
     if(empty.length==0){
+        document.querySelector("[customID='task-word-count']").innerHTML = `Word count __`;
         var destination = document.querySelector("[customID='task-output']");
         waiting(destination);
         isWaiting = true;
@@ -615,15 +626,24 @@ function sendFeedback(feedback){
     var prompt = recentTasksContainer.querySelectorAll("[customID='tasks-header']")[0].innerHTML;
     var completion = recentTasksContainer.querySelectorAll("[customID='tasks-body']")[0].innerHTML;
 
-    var data = {"member": member, "feedback": feedback, "prompt": prompt, "completion": completion}
-    fetch(url, {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: {
-            'Content-Type': 'application/json'
-        },
-    });
-
+    var jobIndex = form.querySelector("[customID='user-job-list']").selectedIndex-1;
+    if(jobIndex<0||jobIndex>userJobs.length) {
+        var jobID = document.querySelectorAll("[customID='job-container']")[jobIndex].getAttribute("jobID");
+        var data = {
+            "member_id": member,
+            "job_id": jobID,
+            "feedback": feedback, 
+            "prompt": prompt, 
+            "completion": completion
+        }
+        fetch(url, {
+            method: "POST",
+            body: JSON.stringify(data),
+            headers: {
+                'Content-Type': 'application/json'
+            },
+        });
+    } 
     //show feedback text
     document.querySelector(".feedback-bar").style.display = "none";
     document.querySelector(".feedback-text").style.display = "block";
