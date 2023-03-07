@@ -234,7 +234,7 @@ def handle_task():
         messages.append({"role": "system", "content": f"You may use following context to answer the next question.\nContext: {context}"})
 
     #add current prompt
-    messages.append({"role": "user", "content": f"Under your role as me, write a {category} about {topic}. {additional}."})
+    messages.append({"role": "user", "content": f"Using the same style, structure, syntax, semantics, reasoning, and rationale used above, write a {category} about {topic}. {additional}"})
 
     completion = turbo_openai_call(messages, 1000, 0.9, 0.6)
 
@@ -364,6 +364,8 @@ def share_job():
 
     #create unique id
     u = uuid.uuid4()
+    #remove dashes
+    u = str(u).replace("-", "")
 
     dummy_user = User(id = u, name = user.name, monthly_words = 0, about = user.about, description = user.description)
     db.session.add(dummy_user)
@@ -439,5 +441,5 @@ def reset_words():
     return Response(status=200)
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
     

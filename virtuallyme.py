@@ -79,17 +79,18 @@ def construct_messages(user, samples, maxlength, current_prompt):
     """
 
     about = user.about or ""
-    description = user.description or ""
+    description = ""
+    #description = user.description or ""
 
     messages = []
     length = 0 #approxime length of prompt
-    role = "Your role is to be me. You must give responses that replicate what I would say. Write responses using the perplexity and burstiness of my language, including my word choice, tonality, sentence structure, semantics and syntax."
+    role = "Your role to replicate the language, syntax, semantics, reasoning, and rationale of the user."
     if about != "":
         role += f"\nHere is some information about me: {about}"
     if description != "":
         role += f"\nHere is a description of my writing style: {description}"
 
-    messages.append({"role": "user", "content": role})
+    messages.append({"role": "system", "content": role})
     length += len(role.split())
 
     cosine_similarities = rank_samples(current_prompt, [d["completion"] for d in samples])
@@ -100,10 +101,11 @@ def construct_messages(user, samples, maxlength, current_prompt):
             ##1000 tokens ~ 750 words
             break
         else:
-            messages.append({"role": "user", "content": "Under your role as me, " + prompt_completion["prompt"]})
             messages.append({"role": "assistant", "content": prompt_completion["completion"]})
+            messages.append({"role": "user", "content": prompt_completion["prompt"]})
             length += len(prompt_completion["prompt"].split())+len(prompt_completion["completion"].split())
-    return messages
+    #reverse order of messages so most relevant samples appear down the bottom
+    return [messages[0]]+messages[1:][::-1]
 
 async def fetch_page(url, session):
     try:
