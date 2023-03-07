@@ -202,14 +202,17 @@ def handle_task():
     user = User.query.get(request.json["member_id"])
     job_id = int(request.json["job_id"])
 
-    if job_id == -1:
-        #combine all job data
-        samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
-    elif job_id > 0:
-        job = Job.query.get(job_id)
-        #get job data
-        samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for d in job.data]
-    else:
+    try:
+        if job_id == -1:
+            #combine all job data
+            samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
+        elif job_id > 0:
+            job = Job.query.get(job_id)
+            #get job data
+            samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for d in job.data]
+        else:
+            samples = []
+    except:
         #no job data
         samples = []
     
@@ -231,7 +234,7 @@ def handle_task():
         messages.append({"role": "system", "content": f"You may use following context to answer the next question.\nContext: {context}"})
 
     #add current prompt
-    messages.append({"role": "user", "content": f"Using my writing style, write a {category} about {topic}. {additional}."})
+    messages.append({"role": "user", "content": f"Under your role as me, write a {category} about {topic}. {additional}."})
 
     completion = turbo_openai_call(messages, 1000, 0.9, 0.6)
 
@@ -259,14 +262,17 @@ def handle_rewrite():
     user = User.query.get(request.json["member_id"])
     job_id = int(request.json["job_id"])
 
-    if job_id == -1:
-        #combine all job data
-        samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
-    elif job_id > 0:
-        job = Job.query.get(job_id)
-        #get job data
-        samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for d in job.data]
-    else:
+    try:
+        if job_id == -1:
+            #combine all job data
+            samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
+        elif job_id > 0:
+            job = Job.query.get(job_id)
+            #get job data
+            samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for d in job.data]
+        else:
+            samples = []
+    except:
         #no job data
         samples = []
 
@@ -277,7 +283,7 @@ def handle_rewrite():
     messages = construct_messages(user, samples, maxlength, text)
 
     #add current prompt
-    messages.append({"role": "user", "content": f"Now I want you to rewrite the following text using my writing style. {additional}. Text: {text}"})
+    messages.append({"role": "user", "content": f"Now I want you to rewrite the following text into my words. {additional}. Text: {text}"})
 
     completion = turbo_openai_call(messages, 1000, 0.9, 0.6)
 
@@ -322,7 +328,7 @@ def handle_idea():
 @app.route("/handle_feedback", methods=["GET", "POST"])
 def handle_feedback():
     job_id = int(request.json["job_id"])
-    if job_id > 0:
+    try:
         job = Job.query.get(job_id)
         prompt = request.json["prompt"]
         completion = request.json["completion"]
@@ -330,7 +336,7 @@ def handle_feedback():
 
         db.session.add(Data(prompt=prompt, completion=completion, feedback=feedback, job_id=job.id))
         db.session.commit()
-    else:
+    except:
         #if job number not specified, do nothing
         pass
     
@@ -389,7 +395,7 @@ def share_job():
     return Response(status=200)
 
 @app.route("/remove_shared_job", methods=["POST"])
-def remove_job():
+def remove_shared_job():
     """
     Removes shared job from database.
 

@@ -89,7 +89,7 @@ def construct_messages(user, samples, maxlength, current_prompt):
     if description != "":
         role += f"\nHere is a description of my writing style: {description}"
 
-    messages.append({"role": "system", "content": role})
+    messages.append({"role": "user", "content": role})
     length += len(role.split())
 
     cosine_similarities = rank_samples(current_prompt, [d["completion"] for d in samples])
@@ -100,7 +100,7 @@ def construct_messages(user, samples, maxlength, current_prompt):
             ##1000 tokens ~ 750 words
             break
         else:
-            messages.append({"role": "user", "content": "Under your role," + prompt_completion["prompt"]})
+            messages.append({"role": "user", "content": "Under your role as me, " + prompt_completion["prompt"]})
             messages.append({"role": "assistant", "content": prompt_completion["completion"]})
             length += len(prompt_completion["prompt"].split())+len(prompt_completion["completion"].split())
     return messages
