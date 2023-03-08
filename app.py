@@ -120,6 +120,26 @@ def create_job():
     #return new job ID
     return Response(json.dumps({"job_id": job.id}), status=200)
 
+@app.route("/remove_job", methods=["POST"])
+def remove_job():
+    """
+    Removes shared job from database.
+
+    :param member_id: member that job belonds to
+    :param job_id: job to be removed
+    """
+    user = User.query.get(request.json["member_id"])
+    job = Job.query.get(request.json["job_id"])
+    
+    for d in job.data:
+        db.session.delete(d)
+    
+    db.session.delete(job)
+    db.session.delete(user)
+
+    db.session.commit()
+    return Response(status=200)
+
 @app.route("/sync_job", methods=["POST"])
 def sync_job():
     """
@@ -234,13 +254,17 @@ def handle_task():
         messages.append({"role": "system", "content": f"You may use following context to answer the next question.\nContext: {context}"})
 
     #add current prompt
-    messages.append({"role": "user", "content": f"Using the same style, structure, syntax, semantics, reasoning, and rationale used above, write a {category} about {topic}. {additional}"})
+    if len([d for d in messages if d["role"]=="user"]) > 0:
+        messages.append({"role": "user", "content": f"You have adopted the persona as the author of the above completions. Using the same idiolect, structure, syntax, word choices, reasoning, and rationale employed by the above, write a {category} about {topic}. {additional}"})
+    else:
+        #no user samples
+        messages.append({"role": "user", "content": f"Using a high degree of variation in your structure, syntax, and semantics, write a {category} about {topic}. {additional}"})
 
     completion = turbo_openai_call(messages, 1000, 0.9, 0.6)
 
     if search and search_result["result"] != "":
         #if web search was successful, return the source
-        completion += "\n\nSources:\n" + "\n\n".join(search_result["urls"])
+        completion += "\n\nSources:\n\n" + "\n\n".join(search_result["urls"])
 
     #store task data    
     task = Task(prompt = f"Write a {category} about {topic}.", completion = completion, category="task", user_id=user.id)
@@ -283,7 +307,10 @@ def handle_rewrite():
     messages = construct_messages(user, samples, maxlength, text)
 
     #add current prompt
-    messages.append({"role": "user", "content": f"Now I want you to rewrite the following text into my words. {additional}. Text: {text}"})
+    if len([d for d in messages if d["role"]=="user"]) > 0:
+        messages.append({"role": "user", "content": f"Rewrite the following text using the same persona, structure, syntax, word choices, reasoning, and rationale used above. {additional} Text: {text}"})
+    else:
+         messages.append({"role": "user", "content": f"Rewrite the following text using a high degree of variation in your structure, syntax, and semantics. {additional} Text: {text}"})
 
     completion = turbo_openai_call(messages, 1000, 0.9, 0.6)
 
@@ -441,5 +468,5 @@ def reset_words():
     return Response(status=200)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
     

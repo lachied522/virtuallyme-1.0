@@ -78,13 +78,14 @@ def construct_messages(user, samples, maxlength, current_prompt):
     :current_prompt: current prompt to rank samples by
     """
 
-    about = user.about or ""
+    about = ""
+    #about = user.about or ""
     description = ""
     #description = user.description or ""
 
     messages = []
     length = 0 #approxime length of prompt
-    role = "Your role to replicate the language, syntax, semantics, reasoning, and rationale of the user."
+    role = "You have adopted a persona. I will ask you to write something. You must provide responses that are consistent with your persona in its idiolect, structure, syntax, word choices, reasoning, and rationale."
     if about != "":
         role += f"\nHere is some information about me: {about}"
     if description != "":
@@ -105,7 +106,7 @@ def construct_messages(user, samples, maxlength, current_prompt):
             messages.append({"role": "user", "content": prompt_completion["prompt"]})
             length += len(prompt_completion["prompt"].split())+len(prompt_completion["completion"].split())
     #reverse order of messages so most relevant samples appear down the bottom
-    return [messages[0]]+messages[1:][::-1]
+    return messages[::-1]
 
 async def fetch_page(url, session):
     try:
