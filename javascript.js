@@ -319,6 +319,9 @@ function removeJob(jobElement){
         }
         
     })
+    jobElement.querySelector("[customID='job-name']").value = jobName;
+    updateJobWords(jobElement, 0);
+    
 }
 
 function configTask(taskWrapper){
