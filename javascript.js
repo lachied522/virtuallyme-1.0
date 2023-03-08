@@ -33,7 +33,12 @@ function updateUserWords(value){
 }
 
 function newJob(jobName){
-    let index = userJobs.length;
+    //find index of first empty spot in userJobs
+    if(userJobs.indexOf("")===-1){
+        let index = userJobs.length
+    } else {
+        let index = userJobs.indexOf("");
+    }
     let jobElement = document.querySelectorAll("[customID='job-container']")[index];
     //add job to job lists
     userJobs.push(jobName);
@@ -313,15 +318,32 @@ function removeSample(jobElement, sampleWrapper){
 }
 
 function removeJob(jobElement){
-    jobElement.querySelectorAll(".sample-wrapper").forEach(sampleWrapper => {
-        if(sampleWrapper.querySelector("[customID='sample-text']").value.trim()!=""){
-            removeSample(jobElement, sampleWrapper);
-        }
-        
+    const url = "https://virtuallyme.onrender.com/remove_job";
+    var body = {
+        "member_id": member,
+        "job_id": jobElement.getAttribute("jobID")
+    };
+    fetch(url, {
+        method: "POST",
+        body: JSON.stringify(body),
+        headers: {
+            "Content-Type": "application/json"
+        },
+    }).then(response => {
+        if(response.ok){
+            let array = Array.from(document.querySelectorAll("[customID='job-container']"));
+            let index = array.indexOf(jobElement);
+            userJobs[index] = "";
+            jobElement.querySelectorAll(".sample-wrapper").forEach(sampleWrapper => {
+                if(sampleWrapper.querySelector("[customID='sample-text']").value.trim()!=""){
+                    removeSample(jobElement, sampleWrapper);
+                }
+                
+            });
+            jobElement.querySelector("[customID='job-name']").value = "";
+            updateJobWords(jobElement, 0);
+        }    
     })
-    jobElement.querySelector("[customID='job-name']").value = jobName;
-    updateJobWords(jobElement, 0);
-    
 }
 
 function configTask(taskWrapper){
@@ -375,19 +397,28 @@ function share(jobElement){
 
 
 function removeSharedJob(id){
-    const url = "https://virtuallyme.onrender.com/remove_shared_job";
-
-    var body = {
-        "member_id": member,
+    const body = {
+        "member_id": id,
         "job_id": id
-    };
-
-    fetch(url, {
+    }
+    //first remove job from db
+    fetch("https://virtuallyme.onrender.com/remove_job", {
         method: "POST",
         body: JSON.stringify(body),
         headers: {
             "Content-Type": "application/json"
         },
+    }).then(response =>{
+        if(response.ok){
+            //unlink job from user
+            fetch("https://hooks.zapier.com/hooks/catch/14316057/3budn3o/", {
+                method: "POST",
+                body: JSON.stringify(body),
+                headers: {
+                    "Content-Type": "application/json"
+                },
+            })
+        }
     })
 }
 

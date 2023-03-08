@@ -181,7 +181,6 @@ async def conduct_search(query):
 
 def search_web(query):
     loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     return loop.run_until_complete(conduct_search(query))
 
 def sort_samples(samples):

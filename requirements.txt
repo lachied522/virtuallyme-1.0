@@ -1,4 +1,4 @@
-uvicorn
+gunicorn
 psycopg2
 Flask
 Flask-SQLAlchemy
