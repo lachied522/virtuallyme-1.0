@@ -1,6 +1,7 @@
 from flask import Flask, Response, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+from asgiref.wsgi import WsgiToAsgi
 
 import json
 import uuid
@@ -10,6 +11,7 @@ from virtuallyme import *
 from database import DATABASE_URL
 
 app = Flask(__name__)
+asgi_app = WsgiToAsgi(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -210,7 +212,7 @@ def sync_job():
     return Response(status=200)
 
 @app.route("/handle_task", methods=["GET", "POST"])
-def handle_task():
+async def handle_task():
     """
     :param member_id: user's Memberstack ID
     :param job_id: job that the changes have been made for
@@ -242,7 +244,7 @@ def handle_task():
     search = request.json["search"]=="true"
 
     if search:
-        search_result = search_web(topic)
+        search_result = await conduct_search(topic)
     else:
         search_result = {"result": ""}
 
@@ -468,5 +470,5 @@ def reset_words():
     return Response(status=200)
 
 if __name__ == "__main__":
-    app.run()
+    asgi_app.run()
     

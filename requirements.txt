@@ -1,4 +1,4 @@
-gunicorn
+hypercorn
 psycopg2
 Flask[async]
 Flask-SQLAlchemy

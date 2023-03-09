@@ -77,7 +77,6 @@ def construct_messages(user, samples, maxlength, current_prompt):
     :param maxLength: max length for prompt
     :current_prompt: current prompt to rank samples by
     """
-
     about = ""
     #about = user.about or ""
     description = ""
@@ -178,10 +177,6 @@ async def conduct_search(query):
             return {"result": completion, "urls": list(set(urls))}
     except:
         return {"result": "", "urls": []}
-
-def search_web(query):
-    loop = asyncio.new_event_loop()
-    return loop.run_until_complete(conduct_search(query))
 
 def sort_samples(samples):
     return list(dict.fromkeys(sorted(samples,key=len,reverse=True)))

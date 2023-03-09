@@ -333,7 +333,6 @@ function removeJob(jobElement){
         if(response.ok){
             let array = Array.from(document.querySelectorAll("[customID='job-container']"));
             let index = array.indexOf(jobElement);
-            userJobs[index] = "";
             jobElement.querySelectorAll(".sample-wrapper").forEach(sampleWrapper => {
                 if(sampleWrapper.querySelector("[customID='sample-text']").value.trim()!=""){
                     removeSample(jobElement, sampleWrapper);
