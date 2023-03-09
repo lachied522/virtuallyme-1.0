@@ -1,12 +1,12 @@
 gunicorn
-uvicorn
 psycopg2
-Flask
+Flask[async]
 Flask-SQLAlchemy
 flask-cors
 SQLAlchemy
 openai
 asyncio
+gevent
 scikit-learn
 google-api-python-client
 beautifulsoup4
