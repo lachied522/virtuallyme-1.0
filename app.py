@@ -11,10 +11,9 @@ from virtuallyme import *
 from database import DATABASE_URL
 
 app = Flask(__name__)
-asgi_app = WsgiToAsgi(app)
-
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+asgi_app = WsgiToAsgi(app)
 
 db = SQLAlchemy(app)
 CORS(app)
