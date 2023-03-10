@@ -82,17 +82,23 @@ def get_user():
     user = User.query.get(request.headers.get("member_id"))
     
     user_jobs = []
-    for job in user.jobs:
-        try:
+    user_tasks = []
+    user_idea = []
+    user_rewrites = []
+    try:
+        for job in user.jobs:
             job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
             user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
-        except:
-            print("Could not load job data")
 
-    user_tasks = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="task"]
-    user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
-    user_rewrites = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="rewrite"]
-
+        user_tasks = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="task"]
+        user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
+        user_rewrites = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="rewrite"]
+    except AttributeError:
+        #user has not been created
+        user = User(id = request.json["member_id"], monthly_words = 0)
+        db.session.add(user)
+        db.session.commit()
+        
     response_dict = {
         "words": user.monthly_words or 0,
         "user": user_jobs,
@@ -115,7 +121,6 @@ def create_job():
     job = Job(name=request.json["job_name"], word_count=0, user_id=user.id)
     db.session.add(job)
     db.session.commit()
-
     #return new job ID
     return Response(json.dumps({"job_id": job.id}), status=200)
 
