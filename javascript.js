@@ -32,12 +32,16 @@ function updateUserWords(value){
     })
 }
 
+function updateUserJobs(value){
+    document.querySelector("[customID='job-count']").innerHTML = String(value)+"/"+String(maxJobs);
+}
+
 function newJob(jobName){
     //find index of first empty spot in userJobs
     if(userJobs.indexOf("")===-1){
-        let index = userJobs.length
+        var index = userJobs.length
     } else {
-        let index = userJobs.indexOf("");
+        var index = userJobs.indexOf("");
     }
     let jobElement = document.querySelectorAll("[customID='job-container']")[index];
     //add job to job lists
@@ -50,7 +54,7 @@ function newJob(jobName){
         element.value = jobName;
     });
     //increase job count
-    document.querySelector("[customID='job-count']").innerHTML = String(userJobs.length)+"/"+String(maxJobs);
+    updateUserJobs(userJobs.length);
     //show job tab button
     var jobTabButtons = document.querySelectorAll(".job-tab");
     jobTabButtons[index].style.display = "block";
@@ -339,10 +343,10 @@ function removeJob(jobElement){
                 if(sampleWrapper.querySelector("[customID='sample-text']").value.trim()!=""){
                     removeSample(jobElement, sampleWrapper);
                 }
-                
             });
             jobElement.querySelector("[customID='job-name']").value = "";
             updateJobWords(jobElement, 0);
+            updateUserJobs();
         }    
     })
 }
