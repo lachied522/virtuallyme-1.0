@@ -32,8 +32,14 @@ function updateUserWords(value){
     })
 }
 
-function updateUserJobs(value){
-    document.querySelector("[customID='job-count']").innerHTML = String(value)+"/"+String(maxJobs);
+function updateUserJobs(jobsArray){
+    userJobs = jobsArray;
+    document.querySelector("[customID='job-count']").innerHTML = String(jobsArray.length)+"/"+String(maxJobs);
+    for(let i=0; i<jobsArray.length; i++){
+        document.querySelectorAll("[customID='user-job-list']").forEach(element => {
+            element.innerHTML += `<option>${jobsArray[i]}</option>`;
+        });
+    }
 }
 
 function newJob(jobName){
@@ -49,12 +55,9 @@ function newJob(jobName){
     //add job name to job Element
     jobElement.querySelector("[customID='job-name']").value = jobName;
 
-    document.querySelectorAll("[customID='user-job-list']").forEach(element => {
-        element.innerHTML += `<option>${jobName}</option>`
-        element.value = jobName;
-    });
+
     //increase job count
-    updateUserJobs(userJobs.length);
+    updateUserJobs(userJobs);
     //show job tab button
     var jobTabButtons = document.querySelectorAll(".job-tab");
     jobTabButtons[index].style.display = "block";
