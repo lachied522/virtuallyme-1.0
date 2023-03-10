@@ -55,7 +55,7 @@ function newJob(jobName){
     //add job name to job Element
     jobElement.querySelector("[customID='job-name']").value = jobName;
 
-
+    let jobsArray = userJobs;
     //increase job count
     updateUserJobs(userJobs);
     //show job tab button
@@ -347,9 +347,15 @@ function removeJob(jobElement){
                     removeSample(jobElement, sampleWrapper);
                 }
             });
-            jobElement.querySelector("[customID='job-name']").value = "";
+            let jobName = jobElement.querySelector("[customID='job-name']").value;
             updateJobWords(jobElement, 0);
-            updateUserJobs();
+            let jobsArray = [];
+            for(let i=0; i<userJobs.length; i++){
+                if(userJobs[i]!==jobName){
+                    jobsArray.push(userJobs[i]);
+                }
+            }
+            updateUserJobs(jobsArray);
         }    
     })
 }
@@ -383,9 +389,7 @@ function share(jobElement){
     //call sync function first
     syncJob(jobNumber);
     const url = "https://virtuallyme.onrender.com/share_job";
-
     var form = jobElement.querySelector("[customID='share-job']");
-
     var body = {
         "member_id": member,
         "job_id": jobElement.getAttribute("jobID"),
