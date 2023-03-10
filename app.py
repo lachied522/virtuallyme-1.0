@@ -1,7 +1,6 @@
 from flask import Flask, Response, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from asgiref.wsgi import WsgiToAsgi
 
 import json
 import uuid
@@ -13,7 +12,6 @@ from database import DATABASE_URL
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-asgi_app = WsgiToAsgi(app)
 
 db = SQLAlchemy(app)
 CORS(app)
@@ -211,7 +209,7 @@ def sync_job():
     return Response(status=200)
 
 @app.route("/handle_task", methods=["GET", "POST"])
-async def handle_task():
+def handle_task():
     """
     :param member_id: user's Memberstack ID
     :param job_id: job that the changes have been made for
@@ -243,7 +241,7 @@ async def handle_task():
     search = request.json["search"]=="true"
 
     if search:
-        search_result = await conduct_search(topic)
+        search_result = search_web(topic)
     else:
         search_result = {"result": ""}
 
@@ -444,12 +442,10 @@ def remove_shared_job():
     db.session.delete(dummy_user)
 
     url = "https://hooks.zapier.com/hooks/catch/14316057/3budn3o/"
-
     data = {
         "member": request.json["member_id"],
         "id": job_id
     }
-
     response = requests.post(url, data=json.dumps(data))
 
     db.session.commit()
@@ -469,5 +465,5 @@ def reset_words():
     return Response(status=200)
 
 if __name__ == "__main__":
-    asgi_app.run()
+    app.run(debug=True)
     
