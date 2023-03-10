@@ -81,10 +81,6 @@ def get_user():
     """
     user = User.query.get(request.headers.get("member_id"))
     
-    user_jobs = []
-    user_tasks = []
-    user_idea = []
-    user_rewrites = []
     try:
         for job in user.jobs:
             job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
@@ -93,9 +89,13 @@ def get_user():
         user_tasks = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="task"]
         user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
         user_rewrites = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="rewrite"]
-    except AttributeError:
+    except:
+        user_jobs = []
+        user_tasks = []
+        user_idea = []
+        user_rewrites = []
         #user has not been created
-        user = User(id = request.json["member_id"], monthly_words = 0)
+        user = User(id=request.headers.get("member_id"), monthly_words=0)
         db.session.add(user)
         db.session.commit()
         
@@ -139,7 +139,6 @@ def remove_job():
         db.session.delete(d)
     
     db.session.delete(job)
-    db.session.delete(user)
 
     db.session.commit()
     return Response(status=200)

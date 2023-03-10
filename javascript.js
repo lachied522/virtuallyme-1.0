@@ -50,21 +50,17 @@ function newJob(jobName){
         var index = userJobs.indexOf("");
     }
     let jobElement = document.querySelectorAll("[customID='job-container']")[index];
-    //add job to job lists
-    userJobs.push(jobName);
     //add job name to job Element
     jobElement.querySelector("[customID='job-name']").value = jobName;
-
     let jobsArray = userJobs;
     //increase job count
-    updateUserJobs(userJobs);
+    updateUserJobs(jobsArray);
     //show job tab button
     var jobTabButtons = document.querySelectorAll(".job-tab");
     jobTabButtons[index].style.display = "block";
     jobTabButtons[index].innerHTML = jobName;
     //set text area resize to none prior to cloning
     jobElement.querySelector("[customID='sample-text']").style.resize = "none";
-
     return jobElement
 }
 
@@ -342,8 +338,8 @@ function removeJob(jobElement){
             let index = array.indexOf(jobElement);
             let jobTabButtons = document.querySelectorAll(".job-tab");
             jobTabButtons[index].style.display = "none";
-            jobElement.querySelectorAll(".sample-wrapper").forEach(sampleWrapper => {
-                if(sampleWrapper.querySelector("[customID='sample-text']").value.trim()!=""){
+            jobElement.querySelectorAll(".sample-wrapper").forEach((sampleWrapper, index) => {
+                if(index>0){
                     removeSample(jobElement, sampleWrapper);
                 }
             });
