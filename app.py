@@ -443,10 +443,9 @@ def remove_shared_job():
     :param member_id: member that job belonds to
     :param job_id: job to be removed
     """
-    job_id = request.json["job_id"]
-    #job id is same as user id for shared job
-    dummy_user = User.query.get(job_id)
-    dummy_job = Job.query.get(job_id)
+    #job id is user id for shared job
+    dummy_user = User.query.get(request.json["job_id"])
+    dummy_job = dummy_user.jobs[0]
     
     for d in dummy_job.data:
         db.session.delete(d)
@@ -457,7 +456,7 @@ def remove_shared_job():
     url = "https://hooks.zapier.com/hooks/catch/14316057/3budn3o/"
     data = {
         "member": request.json["member_id"],
-        "id": job_id
+        "id": request.json["job_id"]
     }
     response = requests.post(url, data=json.dumps(data))
 

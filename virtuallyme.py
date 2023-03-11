@@ -107,3 +107,11 @@ def search_web(query):
 
 def sort_samples(samples):
     return list(dict.fromkeys(sorted(samples,key=len,reverse=True)))
+
+def detect_gpt(text):
+    url = "https://api.gptzero.me/v2/predict/text"
+    headers = {"content-type": "application/json"}
+    data = {"document": text}
+    response = requests.post(url, data=json.dumps(data), headers=headers)
+    response_dict = json.loads(response.text)
+    return (1 - response_dict["documents"][0]["completely_generated_prob"])*100
