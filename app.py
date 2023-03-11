@@ -162,13 +162,16 @@ def sync_job():
             for data in [d for d in job.data if d.feedback=="user-upload"]:
                 db.session.delete(data)
         except:
+            #job has not been created
             job = Job(name=request.json["job_name"], word_count=0, user_id=user.id)
             db.session.add(job)
+            db.session.flush()
     else:
         user = User(id = request.json["member_id"], name = request.json["name"], monthly_words = 0)
         job = Job(name=request.json["job_name"], word_count=0, user_id=user.id)
         db.session.add(job)
         db.session.add(user)
+        db.session.flush()
 
     #add new data
     new_data = request.json["data"]
@@ -262,6 +265,7 @@ def handle_task():
         messages.append({"role": "user", "content": f"You have adopted the persona as the author of the above completions. Using the same idiolect, structure, syntax, word choices, reasoning, and rationale employed by the above, write a {category} about {topic}. {additional}"})
     else:
         #no user samples
+        messages = [d for d in messages if d["role"]!="system"]
         messages.append({"role": "user", "content": f"Using a high degree of variation in your structure, syntax, and semantics, write a {category} about {topic}. {additional}"})
 
     completion = turbo_openai_call(messages, 1000, 0.9, 0.6)
