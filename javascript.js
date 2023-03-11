@@ -43,12 +43,7 @@ function updateUserJobs(jobsArray){
 }
 
 function newJob(jobName){
-    //find index of first empty spot in userJobs
-    if(userJobs.indexOf("")===-1){
-        var index = userJobs.length
-    } else {
-        var index = userJobs.indexOf("");
-    }
+    let index = userJobs.length;
     let jobElement = document.querySelectorAll("[customID='job-container']")[index];
     //add job name to job Element
     jobElement.querySelector("[customID='job-name']").value = jobName;
@@ -130,53 +125,57 @@ function storeTask(tasksContainer, prompt, completion){
     taskBodies[0].innerHTML = completion;
 }
 
-function getUser(){
-    const url = "https://virtuallyme.onrender.com/get_user";
-
-    fetch(url, {
-        method: "GET",
-        headers: {
-            'Content-Type': 'application/json',
-            'member_id': member
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        //store task data
-        for(let i = 0; i < data.tasks.length; i++){
-            storeTask(document.querySelector("#recent-tasks"), data.tasks[i].prompt, data.tasks[i].completion);
-        }
-        //store ideas data
-        for(let i=0; i < data.ideas.length; i++){
-            storeTask(document.querySelector("#recent-ideas"), data.ideas[i].prompt, data.ideas[i].completion);
-        }
-        //store rewrite data
-        for(let i = 0; i < data.rewrites.length; i++){
-            storeTask(document.querySelector("#recent-rewrites"), data.rewrites[i].prompt, data.rewrites[i].completion);
-        }
-        //update user word count
-        updateUserWords(data.words);
-        //add job data
-        for(let i=0; i < data.user.length; i++){
-            let newJobElement = newJob(data.user[i].name);
-            //set job_id
-            newJobElement.setAttribute("jobID", data.user[i].job_id);
-            
-            let samplesGrid = newJobElement.querySelector(".samples-grid");
-            let sampleWrapper = samplesGrid.querySelector(".sample-wrapper");
-            for(let j=0; j < data.user[i].data.length; j++){
-                samplesGrid.appendChild(newSample(newJobElement, sampleWrapper, data.user[i].data[j].prompt, data.user[i].data[j].completion));
+function getUser(counter = 0){
+    console.log(counter);
+    if(counter>=3){
+        return
+    } else {
+        const url = "https://virtuallyme.onrender.com/get_user";
+        fetch(url, {
+            method: "GET",
+            headers: {
+                'Content-Type': 'application/json',
+                'member_id': member
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            //store task data
+            for(let i = 0; i < data.tasks.length; i++){
+                storeTask(document.querySelector("#recent-tasks"), data.tasks[i].prompt, data.tasks[i].completion);
             }
-            updateJobWords(newJobElement, data.user[i].word_count);
-            newJobElement.setAttribute("saved", "true");
-        }
-    })
-    .catch(error => {
-        console.log(error);
-        setTimeout(() => {
-            getUser();
-        }, 3);
-    })
+            //store ideas data
+            for(let i=0; i < data.ideas.length; i++){
+                storeTask(document.querySelector("#recent-ideas"), data.ideas[i].prompt, data.ideas[i].completion);
+            }
+            //store rewrite data
+            for(let i = 0; i < data.rewrites.length; i++){
+                storeTask(document.querySelector("#recent-rewrites"), data.rewrites[i].prompt, data.rewrites[i].completion);
+            }
+            //update user word count
+            updateUserWords(data.words);
+            //add job data
+            for(let i=0; i < data.user.length; i++){
+                let newJobElement = newJob(data.user[i].name);
+                //set job_id
+                newJobElement.setAttribute("jobID", data.user[i].job_id);
+                
+                let samplesGrid = newJobElement.querySelector(".samples-grid");
+                let sampleWrapper = samplesGrid.querySelector(".sample-wrapper");
+                for(let j=0; j < data.user[i].data.length; j++){
+                    samplesGrid.appendChild(newSample(newJobElement, sampleWrapper, data.user[i].data[j].prompt, data.user[i].data[j].completion));
+                }
+                updateJobWords(newJobElement, data.user[i].word_count);
+                newJobElement.setAttribute("saved", "true");
+            }
+        })
+        .catch(error => {
+            console.log(error);
+            setTimeout(() => {
+                getUser(counter+1);
+            }, 30);
+        })
+    }
 }
 
 function syncJob(jobElement) {
@@ -233,35 +232,39 @@ function syncJob(jobElement) {
     });
 }
 
-function createJob() {
+function createJob(counter = 0) {
     if(userJobs.length===maxJobs){
         //max jobs
         return
-    } 
-    const url = "https://virtuallyme.onrender.com/create_job"
-
-    var form = document.querySelector("[customID='create-new-job']");
-    newJobName = form.querySelector("[customInput='new-job-name']").value;
-
-    var newJobElement = newJob(newJobName);
-    newJobElement.setAttribute("jobID", -1);
-    updateJobWords(newJobElement, 0);
-
-    form.reset();
-    fetch(url, {
-        method: "POST",
-        body: JSON.stringify({"member_id": member, "job_name": newJobName}),
-        headers: {
-            "Content-Type": "application/json"
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        newJobElement.setAttribute("jobID", data.job_id);
-    })
-    .catch(error => {
-        console.error("Error loading data:", error);
-    });
+    } else if(counter>=3){
+        return
+    } else {
+        const url = "https://virtuallyme.onrender.com/create_job"
+        fetch(url, {
+            method: "POST",
+            body: JSON.stringify({"member_id": member, "job_name": newJobName}),
+            headers: {
+                "Content-Type": "application/json"
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            var form = document.querySelector("[customID='create-new-job']");
+            newJobName = form.querySelector("[customInput='new-job-name']").value;
+        
+            var newJobElement = newJob(newJobName);
+            newJobElement.setAttribute("jobID", -1);
+            updateJobWords(newJobElement, 0);
+        
+            form.reset();
+            newJobElement.setAttribute("jobID", data.job_id);
+        })
+        .catch(error => {
+            setTimeout(() => {
+                createJob(counter+1);
+            }, 30);
+        });
+    }
 }
 
 function addSample(jobElement) {
