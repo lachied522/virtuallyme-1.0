@@ -82,6 +82,7 @@ def get_user():
     user = User.query.get(request.headers.get("member_id"))
     
     try:
+        user_jobs = []
         for job in user.jobs:
             job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
             user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})

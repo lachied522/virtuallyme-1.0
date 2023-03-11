@@ -334,24 +334,7 @@ function removeJob(jobElement){
         },
     }).then(response => {
         if(response.ok){
-            let array = Array.from(document.querySelectorAll("[customID='job-container']"));
-            let index = array.indexOf(jobElement);
-            let jobTabButtons = document.querySelectorAll(".job-tab");
-            jobTabButtons[index].style.display = "none";
-            jobElement.querySelectorAll(".sample-wrapper").forEach((sampleWrapper, index) => {
-                if(index>0){
-                    removeSample(jobElement, sampleWrapper);
-                }
-            });
-            let jobName = jobElement.querySelector("[customID='job-name']").value;
-            updateJobWords(jobElement, 0);
-            let jobsArray = [];
-            for(let i=0; i<userJobs.length; i++){
-                if(userJobs[i]!==jobName){
-                    jobsArray.push(userJobs[i]);
-                }
-            }
-            updateUserJobs(jobsArray);
+            location.reload();
         }    
     })
 }
@@ -702,6 +685,7 @@ function pageLoad(){
     document.querySelector("[customID='create-job-button']").addEventListener("click", ()=> {
         createJob();
     });
+    document.querySelector("[customID='create-job-button']").maxLength = 100;
     //add functionality to jobs 
     document.querySelectorAll("[customID='job-container']").forEach(jobElement => {    
         jobElement.querySelector("[customID='add-button']").addEventListener("click", () => {
