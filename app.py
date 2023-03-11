@@ -99,8 +99,10 @@ def get_user():
         user = User(id=request.headers.get("member_id"), monthly_words=0)
         db.session.add(user)
         db.session.commit()
-        
+
     response_dict = {
+        "description": user.description or "",
+        "about": user.about or "",
         "words": user.monthly_words or 0,
         "user": user_jobs,
         "tasks": user_tasks,
@@ -194,8 +196,12 @@ def sync_job():
 
     #only consider first 8,000 characters ~ 2000 words
     if len(all_samples_str.split()) > 300 and all_samples_str!=existing_samples_str:
-        prompt = f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of your writing style, including a description of your audience, semantics, syntax, and sentence structure. Speak in first person."
-        description = openai_call(prompt, 500, 0.4, 0.3)
+        try:
+            messages = [{"role": "user", "content": f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of who you are, including a description of your writing style, language, audience, semantics, syntax. Speak in first person."}]
+            description = turbo_openai_call(messages, 500, 0.4, 0.3)
+        except:
+            prompt = f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of who you are, including a description of your writing style, language, auidence, semantics, syntax. Speak in first person."
+            description = openai_call(prompt, 500, 0.4, 0.3)
         #update user description
         user.description = description
 
@@ -399,10 +405,8 @@ def share_job():
 
     #create unique id
     u = uuid.uuid4()
-    #remove dashes
-    u = str(u).replace("-", "")
 
-    dummy_user = User(id = u, name = user.name, monthly_words = 0, about = user.about, description = user.description)
+    dummy_user = User(id = u.hex, name = user.name, monthly_words = 0, about = user.about, description = user.description)
     db.session.add(dummy_user)
     
     dummy_job = Job(name=job.name, word_count=0, user_id=dummy_user.id)
