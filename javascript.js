@@ -32,24 +32,18 @@ function updateUserWords(value){
     })
 }
 
-function updateUserJobs(jobsArray){
-    userJobs = jobsArray;
-    document.querySelector("[customID='job-count']").innerHTML = String(jobsArray.length)+"/"+String(maxJobs);
-    for(let i=0; i<jobsArray.length; i++){
-        document.querySelectorAll("[customID='user-job-list']").forEach(element => {
-            element.innerHTML += `<option>${jobsArray[i]}</option>`;
-        });
-    }
-}
-
 function newJob(jobName){
     let index = userJobs.length;
     let jobElement = document.querySelectorAll("[customID='job-container']")[index];
     //add job name to job Element
+    jobElement.setAttribute("jobID", -1);
     jobElement.querySelector("[customID='job-name']").value = jobName;
-    let jobsArray = userJobs;
+    userJobs.push(jobName);
     //increase job count
-    updateUserJobs(jobsArray);
+    document.querySelector("[customID='job-count']").innerHTML = String(userJobs.length)+"/"+String(maxJobs);
+    document.querySelectorAll("[customID='user-job-list']").forEach(element => {
+        element.innerHTML += `<option>${jobName}</option>`;
+    });
     //show job tab button
     var jobTabButtons = document.querySelectorAll(".job-tab");
     jobTabButtons[index].style.display = "block";
@@ -126,7 +120,6 @@ function storeTask(tasksContainer, prompt, completion){
 }
 
 function getUser(counter = 0){
-    console.log(counter);
     if(counter>=3){
         return
     } else {
@@ -240,6 +233,15 @@ function createJob(counter = 0) {
         return
     } else {
         const url = "https://virtuallyme.onrender.com/create_job"
+        var form = document.querySelector("[customID='create-new-job']");
+        newJobName = form.querySelector("[customInput='new-job-name']").value;
+
+        var popupWrapper = document.querySelector(".popup-wrapper.create-job")
+        var createButton = popupWrapper.querySelector("[customID='create-job-button']");
+        var savingButton = popupWrapper.querySelector(".btn-secondary.small.saving-button")
+
+        createButton.style.dispaly = "none";
+        savingButton.style.display = "flex";
         fetch(url, {
             method: "POST",
             body: JSON.stringify({"member_id": member, "job_name": newJobName}),
@@ -248,16 +250,14 @@ function createJob(counter = 0) {
             },
         })
         .then(response => response.json())
-        .then(data => {
-            var form = document.querySelector("[customID='create-new-job']");
-            newJobName = form.querySelector("[customInput='new-job-name']").value;
-        
+        .then(data => {       
             var newJobElement = newJob(newJobName);
-            newJobElement.setAttribute("jobID", -1);
             updateJobWords(newJobElement, 0);
-        
-            form.reset();
             newJobElement.setAttribute("jobID", data.job_id);
+            popupClose(popupWrapper);
+            form.reset();
+            createButton.style.dispaly = "flex";
+            savingButton.style.display = "none";
         })
         .catch(error => {
             setTimeout(() => {
@@ -301,7 +301,7 @@ function addSample(jobElement) {
         textElement.value = "";
         //increase job word count
         updateJobWords(jobElement, currentWords+newWords);
-        //show save button
+        jobElement.setAttribute("saved", "false");
         jobElement.querySelector("[customID='save-button']").style.display = "flex";
         jobElement.querySelector("[customID='saved-button']").style.display = "none";
     } else {
@@ -367,7 +367,7 @@ function configTask(taskWrapper){
     });
 }
 
-function share(jobElement){
+function share(jobElement, counter=0){
     //call sync function first
     syncJob(jobNumber);
     const url = "https://virtuallyme.onrender.com/share_job";
@@ -379,13 +379,20 @@ function share(jobElement){
         "instructions": form.querySelector("[customInput='instructions']").value,
         "access": form.querySelector("[customInput='access']").value
     };
-
     fetch(url, {
         method: "POST",
         body: JSON.stringify(body),
         headers: {
             "Content-Type": "application/json"
         },
+    }).then(response => {
+        if(!response.ok){
+            if(counter<3){
+                setTimeout(() => {
+                    share(jobElement, counter+1)
+                }, 30)
+            }
+        }
     })
 }
 
@@ -688,7 +695,7 @@ function pageLoad(){
     document.querySelector("[customID='create-job-button']").addEventListener("click", ()=> {
         createJob();
     });
-    document.querySelector("[customID='create-job-button']").maxLength = 100;
+    document.querySelector("[customID='new-job-name']").maxLength = 100;
     //add functionality to jobs 
     document.querySelectorAll("[customID='job-container']").forEach(jobElement => {    
         jobElement.querySelector("[customID='add-button']").addEventListener("click", () => {
