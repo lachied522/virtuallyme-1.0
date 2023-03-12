@@ -321,6 +321,9 @@ function removeSample(jobElement, sampleWrapper){
     let wordCountElement = jobElement.querySelector("[customID='job-word-count']");
     let currentWords = parseInt(wordCountElement.innerHTML.split("/")[0]);
     updateJobWords(jobElement, currentWords-sampleWords);
+    //show save button
+    jobElement.querySelector("[customID='save-button']").style.display = "flex";
+    jobElement.querySelector("[customID='saved-button']").style.display = "none";
 }
 
 function removeJob(jobElement){
@@ -398,28 +401,18 @@ function share(jobElement, counter=0){
 
 
 function removeSharedJob(id){
+    const url = "https://virtuallyme.onrender.com/remove_shared_job"
     const body = {
         "member_id": id,
         "job_id": id
     }
     //first remove job from db
-    fetch("https://virtuallyme.onrender.com/remove_job", {
+    fetch(url, {
         method: "POST",
         body: JSON.stringify(body),
         headers: {
             "Content-Type": "application/json"
         },
-    }).then(response =>{
-        if(response.ok){
-            //unlink job from user
-            fetch("https://hooks.zapier.com/hooks/catch/14316057/3budn3o/", {
-                method: "POST",
-                body: JSON.stringify(body),
-                headers: {
-                    "Content-Type": "application/json"
-                },
-            })
-        }
     })
 }
 
