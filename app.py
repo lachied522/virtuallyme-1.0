@@ -11,6 +11,7 @@ from database import DATABASE_URL
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -236,7 +237,7 @@ def handle_task():
     job_id = int(request.json["job_id"])
 
     try:
-        if job_id == -1:
+        if job_id <= 0:
             #combine all job data
             samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
         elif job_id > 0:
@@ -258,6 +259,7 @@ def handle_task():
         search_result = search_web(topic)
     else:
         search_result = {"result": ""}
+    print(search_result)
 
     maxlength = 2250-len(additional.split())-len(search_result["result"].split())
     messages = construct_messages(user, samples, maxlength, topic)
@@ -483,5 +485,5 @@ def reset_words():
     return Response(status=200)
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
     

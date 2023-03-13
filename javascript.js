@@ -432,7 +432,7 @@ function submitTask() {
 
     //get ID of selected job
     var jobIndex = form.querySelector("[customID='user-job-list']").selectedIndex-1;
-    if(jobIndex<0||jobIndex>userJobs.length){
+    if(jobIndex<=0||jobIndex>userJobs.length){
         var jobID = -1
     } else {
         var jobID = document.querySelectorAll("[customID='job-container']")[jobIndex].getAttribute("jobID");
