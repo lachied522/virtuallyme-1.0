@@ -99,11 +99,15 @@ def construct_messages(user, samples, maxlength, current_prompt):
     return messages[::-1]
 
 def search_web(query):
-    url = "http://virtuallyme-websearch:10000"
+    url = "virtuallyme-websearch:10000"
     headers = {"content-type": "application/json"}
     data = {"query": query}
     response = requests.post(url, data=json.dumps(data), headers=headers)
-    return json.loads(response.text)
+    print(response.text)
+    if response.ok:
+        return json.loads(response.text)
+    else:
+        return {"result": ""}
 
 def sort_samples(samples):
     return list(dict.fromkeys(sorted(samples,key=len,reverse=True)))
