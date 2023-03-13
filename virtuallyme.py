@@ -14,7 +14,7 @@ def turbo_openai_call(messages, max_tokens, temperature, presence_penalty):
         model="gpt-3.5-turbo",
         messages=messages
     )
-    return response["choices"][0]["message"]["content"]
+    return response["choices"][0]["message"]["content"].strip()
 
 
 def openai_call(prompt, max_tokens, temperature, presence_penalty):

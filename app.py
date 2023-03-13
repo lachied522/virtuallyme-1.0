@@ -197,10 +197,10 @@ def sync_job():
     #only consider first 8,000 characters ~ 2000 words
     if len(all_samples_str.split()) > 300 and all_samples_str!=existing_samples_str:
         try:
-            messages = [{"role": "user", "content": f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of your writing style, language, audience, semantics, syntax. Speak in first person."}]
+            messages = [{"role": "user", "content": f"Pretend the following text was written by you. Give an elaborate description of your writing style, language, audience, semantics, syntax. Speak in first person. \nText: {all_samples_str}"}]
             description = turbo_openai_call(messages, 500, 0.4, 0.3)
         except:
-            prompt = f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of your writing style, language, auidence, semantics, syntax. Speak in first person."
+            prompt = f"Pretend the following text was written by you. Give an elaborate description of your writing style, language, auidence, semantics, syntax. Speak in first person.\nText: {all_samples_str}"
             description = openai_call(prompt, 500, 0.4, 0.3)
         #update user description
         user.description = description
@@ -456,15 +456,16 @@ def remove_shared_job():
         if response.ok:
             #job id is user id for shared job
             dummy_user = User.query.get(request.json["job_id"])
-            dummy_job = dummy_user.jobs[0]
-            
-            for d in dummy_job.data:
-                db.session.delete(d)
-            
-            db.session.delete(dummy_job)
-            db.session.delete(dummy_user)
+            if dummy_user is not None:
+                dummy_job = dummy_user.jobs[0]
+                
+                for d in dummy_job.data:
+                    db.session.delete(d)
+                
+                db.session.delete(dummy_job)
+                db.session.delete(dummy_user)
 
-            db.session.commit()
+                db.session.commit()
             break
     return Response(status=200)
 
@@ -482,5 +483,5 @@ def reset_words():
     return Response(status=200)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
     
