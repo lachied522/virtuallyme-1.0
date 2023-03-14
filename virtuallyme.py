@@ -103,7 +103,6 @@ def search_web(query):
     headers = {"content-type": "application/json"}
     data = {"query": query}
     response = requests.post(url, data=json.dumps(data), headers=headers)
-    print(response.text)
     if response.ok:
         return json.loads(response.text)
     else:

@@ -183,6 +183,7 @@ function syncJob(jobElement) {
 
     saveButton.style.display = "none";
     savingButton.style.display = "flex";
+    savedButton.style.display = "none";
 
     var body = {
         "member_id": member, 
@@ -213,12 +214,14 @@ function syncJob(jobElement) {
     .then(response => response.json())
     .then(data => {
         console.log("Success:", data);
+        saveButton.style.display = "none";
         savingButton.style.display = "none";
         savedButton.style.display = "flex";
         jobElement.setAttribute("saved", "true");
     })
     .catch(error => {
         console.error("Error loading data:", error);
+        saveButton.style.display = "none";
         savingButton.style.display = "none";
         savedButton.style.display = "flex";
         jobElement.setAttribute("saved", "false");
@@ -303,6 +306,7 @@ function addSample(jobElement) {
         updateJobWords(jobElement, currentWords+newWords);
         jobElement.setAttribute("saved", "false");
         jobElement.querySelector("[customID='save-button']").style.display = "flex";
+        jobElement.querySelector("[customID='saving-button']").style.display = "none";
         jobElement.querySelector("[customID='saved-button']").style.display = "none";
     } else {
         var originalColor = empty[0].style.borderColor;
@@ -323,6 +327,7 @@ function removeSample(jobElement, sampleWrapper){
     updateJobWords(jobElement, currentWords-sampleWords);
     //show save button
     jobElement.querySelector("[customID='save-button']").style.display = "flex";
+    jobElement.querySelector("[customID='saving-button']").style.display = "none";
     jobElement.querySelector("[customID='saved-button']").style.display = "none";
 }
 
@@ -653,9 +658,11 @@ function sendFeedback(feedback){
     var recentTasksContainer = document.querySelector("[customID='recent-tasks']");
     var prompt = recentTasksContainer.querySelectorAll("[customID='tasks-header']")[0].innerHTML;
     var completion = recentTasksContainer.querySelectorAll("[customID='tasks-body']")[0].innerHTML;
-
+    var form = document.querySelector("[customID='submit-task']");
     var jobIndex = form.querySelector("[customID='user-job-list']").selectedIndex-1;
-    if(jobIndex<0||jobIndex>userJobs.length) {
+    if(jobIndex<0||jobIndex>userJobs.length){
+        //pass
+    } else {
         var jobID = document.querySelectorAll("[customID='job-container']")[jobIndex].getAttribute("jobID");
         var data = {
             "member_id": member,
@@ -671,8 +678,7 @@ function sendFeedback(feedback){
                 'Content-Type': 'application/json'
             },
         });
-    } 
-    //show feedback text
+    }
     document.querySelector(".feedback-bar").style.display = "none";
     document.querySelector(".feedback-text").style.display = "block";
 }

@@ -198,10 +198,10 @@ def sync_job():
     #only consider first 8,000 characters ~ 2000 words
     if len(all_samples_str.split()) > 300 and all_samples_str!=existing_samples_str:
         try:
-            messages = [{"role": "user", "content": f"Pretend the following text was written by you. Give an elaborate description of your writing style, language, audience, semantics, syntax. Speak in first person. \nText: {all_samples_str}"}]
+            messages = [{"role": "user", "content": f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of your writing style, language, audience, semantics, syntax. Speak in first person."}]
             description = turbo_openai_call(messages, 500, 0.4, 0.3)
         except:
-            prompt = f"Pretend the following text was written by you. Give an elaborate description of your writing style, language, auidence, semantics, syntax. Speak in first person.\nText: {all_samples_str}"
+            prompt = f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of your writing style, language, auidence, semantics, syntax. Speak in first person."
             description = openai_call(prompt, 500, 0.4, 0.3)
         #update user description
         user.description = description
@@ -259,7 +259,6 @@ def handle_task():
         search_result = search_web(topic)
     else:
         search_result = {"result": ""}
-    print(search_result)
 
     maxlength = 2250-len(additional.split())-len(search_result["result"].split())
     messages = construct_messages(user, samples, maxlength, topic)
