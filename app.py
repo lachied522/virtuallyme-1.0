@@ -326,10 +326,12 @@ def handle_rewrite():
     #add current prompt
     if len([d for d in messages if d["role"]=="user"]) > 0:
         messages.append({"role": "user", "content": f"Rewrite the following text using the same persona, structure, syntax, word choices, reasoning, and rationale used above. {additional} Text: {text}"})
+        logit_bias = get_logit_bias([d["content"] for d in messages if d["role"]=="assistant"])
     else:
          messages.append({"role": "user", "content": f"Rewrite the following text using a high degree of variation in your structure, syntax, and semantics. {additional} Text: {text}"})
+         logit_bias = {}
 
-    completion = turbo_openai_call(messages, 1000, 0.9, 0.6)
+    completion = turbo_openai_call(messages, 1000, 0.9, 0.6, logit_bias)
 
     #store rewrite data    
     rewrite = Task(prompt = text[:100], completion = completion, category="rewrite", user_id=user.id)
