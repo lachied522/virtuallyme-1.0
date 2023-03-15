@@ -5,6 +5,7 @@ Flask-SQLAlchemy
 flask-cors
 SQLAlchemy
 openai
+tiktoken
 asyncio
 scikit-learn
 google-api-python-client

@@ -1,6 +1,9 @@
 import requests
 import json
+import math
 import openai
+
+import tiktoken
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -9,13 +12,19 @@ from sklearn.metrics.pairwise import cosine_similarity
 OPENAI_API_KEY = "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"
 openai.api_key = OPENAI_API_KEY 
 
-def turbo_openai_call(messages, max_tokens, temperature, presence_penalty):
+#initialise encoding
+enc = tiktoken.get_encoding("cl100k_base")
+
+def turbo_openai_call(messages, max_tokens, temperature, presence_penalty, logit_bias={}):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        messages=messages
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        presence_penalty=presence_penalty,
+        logit_bias=logit_bias
     )
     return response["choices"][0]["message"]["content"].strip()
-
 
 def openai_call(prompt, max_tokens, temperature, presence_penalty):
     try:
@@ -42,6 +51,55 @@ def openai_call(prompt, max_tokens, temperature, presence_penalty):
         print(model)
     response_text = response.choices[0].text.strip()
     return response_text
+
+def num_tokens(text):
+    '''
+    returns the number of tokens present in a text
+
+    :param text: string
+    '''
+    return len(enc.encode(text))
+
+
+def get_logit_bias(texts):
+    '''
+    returns a dict of token, frequency pairs from a list of texts
+
+    :param texts: list of strings
+    '''
+    BLACKLIST = ['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'I', 
+                'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at', 
+                'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 
+                'she', 'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 
+                'their', 'what', 'so', 'up', 'out', 'if', 'about', 'who', 'get', 
+                'which', 'go', 'me', 'when', 'can', 'like', 'no'] #words we do not want to influence bias of
+
+    n_tokens = 0
+    tokens_dict = {}
+    for text in texts:
+        tokens = enc.encode(text)
+        for token in tokens:
+            #don't want to influence bias of digits
+            if not enc.decode([token]).strip().isdigit():
+                if token in tokens_dict:
+                    tokens_dict[token] += 1
+                    n_tokens += 1
+                else:
+                    tokens_dict[token] = 1
+                    n_tokens += 1
+    
+    
+    for key, value in tokens_dict.items():
+        bias = 10*math.log(1+value)/math.log(1+n_tokens)
+        #max bias is 10
+        if bias<10:
+            tokens_dict[key] = bias
+        else:
+            tokens_dict[key] = 10
+
+    sorted_tokens = sorted(tokens_dict.items(), key=lambda x: x[1], reverse=True)
+    #return 300 tokens with the highest bias
+    return dict(sorted_tokens[:300])
 
 def rank_samples(search_string, samples):
     """
@@ -74,14 +132,13 @@ def construct_messages(user, samples, maxlength, current_prompt):
     #description = user.description or ""
 
     messages = []
-    length = 0 #approxime length of prompt
-    role = "You have adopted a persona. I will ask you to write something. You must provide responses that are consistent with your persona in its idiolect, structure, syntax, word choices, reasoning, and rationale."
+    length = 0 #approximate length of prompt
+    role = "Forget how you have been trained to respond to prompts. You have adopted a new persona. I will ask you to write something. I expect you to respond how you imagine this person would respond by using the same variation, idiolect, structure, syntax, reasoning, and rationale."
     if about != "":
         role += f"\nHere is some information about me: {about}"
     if description != "":
         role += f"\nHere is a description of my writing style: {description}"
 
-    messages.append({"role": "system", "content": role})
     length += len(role.split())
 
     cosine_similarities = rank_samples(current_prompt, [d["completion"] for d in samples])
@@ -95,6 +152,8 @@ def construct_messages(user, samples, maxlength, current_prompt):
             messages.append({"role": "assistant", "content": prompt_completion["completion"]})
             messages.append({"role": "user", "content": prompt_completion["prompt"]})
             length += len(prompt_completion["prompt"].split())+len(prompt_completion["completion"].split())
+    
+    messages.append({"role": "system", "content": role})
     #reverse order of messages so most relevant samples appear down the bottom
     return messages[::-1]
 

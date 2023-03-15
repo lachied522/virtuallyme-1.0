@@ -262,20 +262,22 @@ def handle_task():
 
     maxlength = 2250-len(additional.split())-len(search_result["result"].split())
     messages = construct_messages(user, samples, maxlength, topic)
-
+    
     if search and search_result["result"] != "":
         context = search_result["result"]
         messages.append({"role": "system", "content": f"You may use following context to answer the next question.\nContext: {context}"})
 
     #add current prompt
     if len([d for d in messages if d["role"]=="user"]) > 0:
-        messages.append({"role": "user", "content": f"You have adopted the persona as the author of the above completions. Using the same idiolect, structure, syntax, word choices, reasoning, and rationale employed by the above, write a {category} about {topic}. {additional}"})
+        messages.append({"role": "user", "content": f"Using the same variation, idiolect, structure, syntax, word choices, reasoning, and rationale employed in the above, write a {category} about {topic}. {additional} Do not mention this prompt in your response."})
+        logit_bias = get_logit_bias([d["content"] for d in messages if d["role"]=="assistant"])
     else:
         #no user samples
         messages = [d for d in messages if d["role"]!="system"]
         messages.append({"role": "user", "content": f"Using a high degree of variation in your structure, syntax, and semantics, write a {category} about {topic}. {additional}"})
+        logit_bias = {}
 
-    completion = turbo_openai_call(messages, 1000, 0.9, 0.6)
+    completion = turbo_openai_call(messages, 1000, 0.9, 0.6, logit_bias)
 
     if search and search_result["result"] != "":
         #if web search was successful, return the source
