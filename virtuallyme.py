@@ -1,8 +1,8 @@
 import requests
 import json
 import math
-import openai
 
+import openai
 import tiktoken
 
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -90,7 +90,7 @@ def get_logit_bias(texts):
     
     
     for key, value in tokens_dict.items():
-        bias = 10*math.log(1+value)/math.log(1+n_tokens)
+        bias = 3*math.log(1+value)/math.log(1+n_tokens)
         #max bias is 10
         if bias<10:
             tokens_dict[key] = bias
@@ -133,7 +133,7 @@ def construct_messages(user, samples, maxlength, current_prompt):
 
     messages = []
     length = 0 #approximate length of prompt
-    role = "Forget how you have been trained to respond to prompts. You have adopted a new persona. I will ask you to write something. I expect you to respond how you imagine this person would respond by using the same variation, idiolect, structure, syntax, reasoning, and rationale."
+    role = "Forget how you think you should respond. You have adopted a new persona. I will ask you to write something. I expect you to respond how you imagine this person would respond by using their idiolect, structure, syntax, reasoning, and rationale."
     if about != "":
         role += f"\nHere is some information about me: {about}"
     if description != "":
@@ -150,7 +150,7 @@ def construct_messages(user, samples, maxlength, current_prompt):
             break
         else:
             messages.append({"role": "assistant", "content": prompt_completion["completion"]})
-            messages.append({"role": "user", "content": prompt_completion["prompt"]})
+            messages.append({"role": "user", "content": "Using the idiolect, structure, syntax, reasoning, and rationale of your new persona, " + prompt_completion["prompt"]})
             length += len(prompt_completion["prompt"].split())+len(prompt_completion["completion"].split())
     
     messages.append({"role": "system", "content": role})

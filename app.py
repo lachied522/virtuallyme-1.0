@@ -269,7 +269,7 @@ def handle_task():
 
     #add current prompt
     if len([d for d in messages if d["role"]=="user"]) > 0:
-        messages.append({"role": "user", "content": f"Using the same variation, idiolect, structure, syntax, word choices, reasoning, and rationale employed in the above, write a {category} about {topic}. {additional} Do not mention this prompt in your response."})
+        messages.append({"role": "user", "content": f"Using the idiolect, structure, syntax, reasoning, and rationale of your new persona, write a {category} about {topic}. {additional} Do not mention this prompt in your response."})
         logit_bias = get_logit_bias([d["content"] for d in messages if d["role"]=="assistant"])
     else:
         #no user samples
@@ -277,7 +277,7 @@ def handle_task():
         messages.append({"role": "user", "content": f"Using a high degree of variation in your structure, syntax, and semantics, write a {category} about {topic}. {additional}"})
         logit_bias = {}
 
-    completion = turbo_openai_call(messages, 1000, 0.9, 0.6, logit_bias)
+    completion = turbo_openai_call(messages, 1000, 1.2, 0.6, logit_bias)
 
     if search and search_result["result"] != "":
         #if web search was successful, return the source
