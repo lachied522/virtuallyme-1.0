@@ -145,13 +145,11 @@ def construct_messages(user, samples, maxlength, current_prompt):
     ranked_samples = [item for index, item in sorted(enumerate(samples), key = lambda x: cosine_similarities[x[0]], reverse=True)]
     for prompt_completion in [d for d in ranked_samples if d["feedback"]!="negative"]:
         if length+len(prompt_completion["completion"].split())+len(prompt_completion["prompt"].split()) > maxlength:
-            ##prompt limit 3097 tokens (4097-1000 for completion)
-            ##1000 tokens ~ 750 words
             break
         else:
             messages.append({"role": "assistant", "content": prompt_completion["completion"]})
             messages.append({"role": "user", "content": "Using the idiolect, structure, syntax, reasoning, and rationale of your new persona, " + prompt_completion["prompt"]})
-            length += len(prompt_completion["prompt"].split())+len(prompt_completion["completion"].split())
+            length += len(prompt_completion["prompt"].split())+len(prompt_completion["completion"].split())+12
     
     messages.append({"role": "system", "content": role})
     #reverse order of messages so most relevant samples appear down the bottom

@@ -260,7 +260,7 @@ def handle_task():
     else:
         search_result = {"result": ""}
 
-    maxlength = 2250-len(additional.split())-len(search_result["result"].split())
+    maxlength = 2250-len(additional.split())-len(search_result["result"].split()) #prompt limit 3097 tokens (4097-1000 for completion)
     messages = construct_messages(user, samples, maxlength, topic)
     
     if search and search_result["result"] != "":
