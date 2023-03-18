@@ -1,4 +1,11 @@
-import * as animations from "./animations.js"
+function hidePreloader() {
+    const preloader = document.querySelector(".preloader");
+    preloader.style.transition = "opacity 0.5s ease-out";
+    preloader.style.opacity = 0;
+    setTimeout(function() {
+        preloader.style.display = "none";
+    }, 500);
+}
 
 function typeWriter(element, text){
     element.textContent = "";
@@ -95,10 +102,11 @@ function newSample(jobElement, sampleWrapper, prompt, completion){
     return sampleClone
 }
 
-function storeTask(tasksContainer, prompt, completion){
+function storeTask(tasksContainer, data){
     let modules = tasksContainer.querySelectorAll(".module");
     let taskHeaders = tasksContainer.querySelectorAll("[customID='tasks-header']");
     let taskBodies = tasksContainer.querySelectorAll("[customID='tasks-body']");
+    let sourceContainers = tasksContainer.querySelectorAll(".task-source-container");
     if(taskBodies[0].innerHTML.trim()===""){
         //if no existing tasks
         tasksContainer.querySelector("[customID='empty-text']").style.display = "none";
@@ -108,6 +116,18 @@ function storeTask(tasksContainer, prompt, completion){
         for(let i=taskBodies.length-1; i > 0; i--){
             taskBodies[i].innerHTML = taskBodies[i-1].innerHTML;
             taskHeaders[i].innerHTML = taskHeaders[i-1].innerHTML;
+            if(sourceContainers.length>0){
+                sourceContainers[i].querySelectorAll(".link").forEach((link, index) => {
+                    link.parentElement.href = sourceContainers[i-1].querySelectorAll(".link")[index].href;
+                    link.innerHTML = sourceContainers[i-1].querySelectorAll(".link")[index].innerHTML;
+                    if(link.innerHTML!=""){
+                        link.parentElement.target = "_blank";
+                        link.parentElement.style.display = "block";
+                    } else {                                          
+                        link.parentElement.style.display = "none";
+                    }
+                })
+            }
             if(taskBodies[i].innerHTML.trim()!==""){
                 //show the module if non-empty
                 modules[i].style.display = "block";
@@ -115,8 +135,22 @@ function storeTask(tasksContainer, prompt, completion){
         }
     }
     //set first task to the one just completed
-    taskHeaders[0].innerHTML = prompt;
-    taskBodies[0].innerHTML = completion;
+    taskHeaders[0].innerHTML = data.prompt;
+    taskBodies[0].innerHTML = data.completion;
+    if(sourceContainers.length>0){
+        sourceContainers[0].querySelectorAll(".link").forEach((link, index) => {
+            if(index<data.sources.length){
+                link.parentElement.href = data.sources[index].url;
+                link.parentElement.target = "_blank";
+                link.innerHTML = data.sources[index].display;
+                link.parentElement.style.display = "block";
+            } else {
+                link.parentElement.href = "";
+                link.innerHTML = "";
+                link.parentElement.style.display = "none";
+            }
+        })
+    }
 }
 
 function getUser(counter = 0){
@@ -135,15 +169,15 @@ function getUser(counter = 0){
         .then(data => {
             //store task data
             for(let i = 0; i < data.tasks.length; i++){
-                storeTask(document.querySelector("#recent-tasks"), data.tasks[i].prompt, data.tasks[i].completion);
+                storeTask(document.querySelector("#recent-tasks"), data.tasks[i]);
             }
             //store ideas data
             for(let i=0; i < data.ideas.length; i++){
-                storeTask(document.querySelector("#recent-ideas"), data.ideas[i].prompt, data.ideas[i].completion);
+                storeTask(document.querySelector("#recent-ideas"), data.ideas[i]);
             }
             //store rewrite data
             for(let i = 0; i < data.rewrites.length; i++){
-                storeTask(document.querySelector("#recent-rewrites"), data.rewrites[i].prompt, data.rewrites[i].completion);
+                storeTask(document.querySelector("#recent-rewrites"), data.rewrites[i]);
             }
             //update user word count
             updateUserWords(data.words);
@@ -211,9 +245,7 @@ function syncJob(jobElement) {
             "Content-Type": "application/json"
         },
     })
-    .then(response => response.json())
-    .then(data => {
-        console.log("Success:", data);
+    .then(response => {
         saveButton.style.display = "none";
         savingButton.style.display = "none";
         savedButton.style.display = "flex";
@@ -243,7 +275,7 @@ function createJob(counter = 0) {
         var createButton = popupWrapper.querySelector("[customID='create-job-button']");
         var savingButton = popupWrapper.querySelector(".btn-secondary.small.saving-button")
 
-        createButton.style.dispaly = "none";
+        createButton.style.display = "none";
         savingButton.style.display = "flex";
         fetch(url, {
             method: "POST",
@@ -259,7 +291,7 @@ function createJob(counter = 0) {
             newJobElement.setAttribute("jobID", data.job_id);
             popupClose(popupWrapper);
             form.reset();
-            createButton.style.dispaly = "flex";
+            createButton.style.display = "flex";
             savingButton.style.display = "none";
         })
         .catch(error => {
@@ -460,10 +492,12 @@ function submitTask() {
         "additional": additionalElement.value,
         "search": searchElement.getAttribute("on")
     };
-
     //if neither type or topic element is missing
     if(empty.length==0){
         document.querySelector("[customID='task-word-count']").innerHTML = `Word count __`;
+        if(searchElement.getAttribute("on")==="false"){
+            document.querySelector(".sources-container").style.display = "none";
+        }
         var destination = document.querySelector("[customID='task-output']");
         waiting(destination);
         isWaiting = true;
@@ -485,11 +519,31 @@ function submitTask() {
             var words = data.completion.split(" ").length;
             //update task word count
             document.querySelector("[customID='task-word-count']").innerHTML = `Word count: ${words}`;
+            //update sources
+            var sourcesContainer = document.querySelector(".sources-container");
+            if(data.sources.length==0){
+                sourcesContainer.style.display = "none";
+            } else {
+                sourcesContainer.style.display = "flex";
+                sourcesContainer.querySelectorAll(".source-wrapper").forEach((wrapper, index) => {
+                    if(index<data.sources.length){
+                        let source_data = data.sources[index];
+                        wrapper.querySelector(".link").innerHTML = source_data.display;
+                        wrapper.querySelector(".source-link").href = source_data.url;
+                        wrapper.querySelector(".source-link").target = "_blank";
+                        wrapper.querySelector(".sources-text.title").innerHTML = source_data.title;
+                        wrapper.querySelector(".sources-text").innerHTML = source_data.preview;
+                        wrapper.style.display = "block";
+                    } else {
+                        wrapper.style.display = "none";
+                    }
+                })
+            }
             //update user word count
             updateUserWords(userWordCount+words);
             //update tasks list
             var recentTasksContainer = document.querySelector("#recent-tasks");
-            storeTask(recentTasksContainer, `Write a(n) ${typeElement.value} about ${topicElement.value}`, data.completion);
+            storeTask(recentTasksContainer, {"prompt": `Write a(n) ${typeElement.value} about ${topicElement.value}`, "completion": data.completion, "sources": data.sources});
         })
         .catch(error => {
             isWaiting = false;
@@ -557,7 +611,7 @@ function generateIdeas() {
             updateUserWords(userWordCount+words);
             //update ideas list
             var recentIdeasContainer = document.querySelector("#recent-ideas");
-            storeTask(recentIdeasContainer, `Generate content ideas for my ${typeElement.value}`, data.completion);
+            storeTask(recentIdeasContainer, {"prompt": `Generate content ideas for my ${typeElement.value}`, "completion": data.completion});
         })
         .catch(error => {
             isWaitingIdea = false;
@@ -626,7 +680,7 @@ function submitRewrite() {
             updateUserWords(userWordCount+words);
             //update rewrites list
             var rewritesContainer = document.querySelector("#recent-rewrites");
-            storeTask(rewritesContainer, `Rewrite ${textElement.value.slice(0, 100)}`, data.completion);
+            storeTask(rewritesContainer, {"prompt": `Rewrite ${textElement.value.slice(0, 120)}`, "completion": data.completion});
         })
         .catch(error => {
             isWaitingRewrite = false;
@@ -694,7 +748,6 @@ function pageLoad(){
     document.querySelector("[customID='create-job-button']").addEventListener("click", ()=> {
         createJob();
     });
-    document.querySelector("[customID='new-job-name']").maxLength = 100;
     //add functionality to jobs 
     document.querySelectorAll("[customID='job-container']").forEach(jobElement => {    
         jobElement.querySelector("[customID='add-button']").addEventListener("click", () => {
@@ -710,7 +763,7 @@ function pageLoad(){
         });
     });
     //add functionality to task wrappers
-    document.querySelectorAll("[customID='submit-task']").forEach(taskElement => {
+    document.querySelectorAll(".task-wrapper").forEach(taskElement => {
         configTask(taskElement);
     });
     //add search toggle functionality
@@ -728,6 +781,9 @@ function pageLoad(){
         sendFeedback('negative');
     });
 }
+
+
+pageLoad();
 
 let isWaiting = false;
 let isWaitingRewrite = false;

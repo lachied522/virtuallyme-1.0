@@ -4,6 +4,7 @@ from sqlalchemy_utils import URLType
 from flask_cors import CORS
 
 import json
+from datetime import datetime
 import uuid
 
 from virtuallyme import *
@@ -45,6 +46,7 @@ class Task(db.Model):
     prompt = db.Column(db.Text)
     completion = db.Column(db.Text)
     category = db.Column(db.String(100)) #task, idea, or rewrite
+    created_at = db.Column(db.DateTime, default=datetime.utcnow())
     sources = db.relationship('Source', backref='sources', lazy='joined')
     user_id = db.Column(db.String(100), db.ForeignKey('user.id'))
 
@@ -103,12 +105,13 @@ def get_user():
             user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
 
         user_tasks = []
-        for task in [d for d in user.tasks if d.category=="task"]:
+        for task in [d for d in Task.query.filter_by(user_id=request.headers.get("member_id")).order_by(Task.created_at.desc()).limit(5).all() if d.category=="task"]:
             sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in task.sources]
             user_tasks.append({"prompt": task.prompt, "completion": task.completion, "sources": sources})
         user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
         user_rewrites = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="rewrite"]
     except Exception as e:
+        print(e)
         user_jobs = []
         user_tasks = []
         user_idea = []
