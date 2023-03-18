@@ -1,5 +1,6 @@
-from flask import Flask, Response, request
+from flask import Flask, Response, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy_utils import URLType
 from flask_cors import CORS
 
 import json
@@ -44,7 +45,16 @@ class Task(db.Model):
     prompt = db.Column(db.Text)
     completion = db.Column(db.Text)
     category = db.Column(db.String(100)) #task, idea, or rewrite
+    sources = db.relationship('Source', backref='sources', lazy='joined')
     user_id = db.Column(db.String(100), db.ForeignKey('user.id'))
+
+class Source(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(URLType())
+    display = db.Column(URLType())
+    title = db.Column(db.String())
+    preview = db.Column(db.Text())
+    task_id = db.Column(db.Integer, db.ForeignKey("task.id"))
     
 class Data(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -59,6 +69,10 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Headers'] = 'member_id, Access-Control-Allow-Headers, Access-Control-Request-Headers, Origin, Accept, Content-Type'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     return response
+
+@app.route("/javascript", methods=["GET"])
+def serve_js():
+    return send_from_directory(".", "javascript.js")
 
 @app.route("/create_user", methods=["POST"])
 def create_user():
@@ -88,10 +102,13 @@ def get_user():
             job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
             user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
 
-        user_tasks = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="task"]
+        user_tasks = []
+        for task in [d for d in user.tasks if d.category=="task"]:
+            sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in task.sources]
+            user_tasks.append({"prompt": task.prompt, "completion": task.completion, "sources": sources})
         user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
         user_rewrites = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="rewrite"]
-    except:
+    except Exception as e:
         user_jobs = []
         user_tasks = []
         user_idea = []
@@ -223,6 +240,23 @@ def sync_job():
     db.session.commit()
     return Response(status=200)
 
+@app.route("/sync_tasks", methods=["POST"])
+def sync_tasks():
+    user = User.query.get(request.json["member_id"])
+    categories = list(set([str(d.category) for d in user.tasks])) #task, idea, rewrite
+
+    for category in categories:
+        tasks = [d for d in user.tasks if d.category==category]
+        if len(tasks)>5:
+            for task in tasks[5:]:
+                if category=="task":
+                    for source in task.sources:
+                        db.session.delete(source)
+                db.session.delete(task)
+            db.session.commit()
+
+    return Response(status=200)
+
 @app.route("/handle_task", methods=["GET", "POST"])
 def handle_task():
     """
@@ -260,7 +294,7 @@ def handle_task():
     else:
         search_result = {"result": ""}
 
-    maxlength = 2250-len(additional.split())-len(search_result["result"].split()) #prompt limit 3097 tokens (4097-1000 for completion)
+    maxlength = 2000-len(additional.split())-len(search_result["result"].split()) #prompt limit 3097 tokens (4097-1000 for completion)
     messages = construct_messages(user, samples, maxlength, topic)
     
     if search and search_result["result"] != "":
@@ -279,17 +313,23 @@ def handle_task():
 
     completion = turbo_openai_call(messages, 1000, 1.2, 0.6, logit_bias)
 
-    if search and search_result["result"] != "":
-        #if web search was successful, return the source
-        completion += "\n\nSources:\n\n" + "\n\n".join(search_result["urls"])
-
-    #store task data    
-    task = Task(prompt = f"Write a {category} about {topic}.", completion = completion, category="task", user_id=user.id)
+    #store task data
+    task = Task(prompt=f"Write a(n) {category} about {topic}.", completion=completion, category="task", user_id=user.id)
     db.session.add(task)
+    
+    if search and search_result["result"] != "":
+        #if web search was successful, return sources
+        sources = search_result["sources"]
+        db.session.flush() #flush session to obtain task id
+        for source in sources:
+            db.session.add(Source(url=source["url"], display=source["display"], title=source["title"], preview=source["preview"], task_id=task.id))
+    else:
+        sources = []
+
     #update word count
     user.monthly_words += len(completion.split())
     db.session.commit()
-    return Response(json.dumps({"completion": completion}), status=200)
+    return Response(json.dumps({"completion": completion, "sources": sources}), status=200)
 
 @app.route("/handle_rewrite", methods=["GET", "POST"])
 def handle_rewrite():
@@ -320,7 +360,7 @@ def handle_rewrite():
     text = request.json["text"]
     additional = request.json["additional"]
     
-    maxlength = 2250-len(additional.split())
+    maxlength = 2000-len(additional.split())
     messages = construct_messages(user, samples, maxlength, text)
 
     #add current prompt
@@ -334,7 +374,7 @@ def handle_rewrite():
     completion = turbo_openai_call(messages, 1000, 0.9, 0.6, logit_bias)
 
     #store rewrite data    
-    rewrite = Task(prompt = text[:100], completion = completion, category="rewrite", user_id=user.id)
+    rewrite = Task(prompt = text[:120], completion = completion, category="rewrite", user_id=user.id)
     db.session.add(rewrite)
     #update word count
     user.monthly_words += len(completion.split())
