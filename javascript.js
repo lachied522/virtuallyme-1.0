@@ -801,6 +801,50 @@ function pageLoad(){
     });
 }
 
+document.querySelectorAll(".upload-sample-box").forEach((uploadBox, index) => {
+    uploadBox.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadBox.classList.add('dragover');
+    });
+    
+    uploadBox.addEventListener('dragleave', () => {
+        uploadBox.classList.remove('dragover');
+    });
+
+    uploadBox.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadBox.classList.remove('dragover');
+        uploadFiles(uploadBox, e.dataTransfer.files);
+    });
+});
+
+document.getElementById("upload-file").addEventListener("change", () => {
+    let files = document.getElementById("upload-file").files;
+    if(files.length>0){
+        document.querySelectorAll(".file-upload").forEach(jobElement => {
+            let uploadBox = jobElement.querySelector(".upload-sample-box");
+            uploadBox.querySelector(".upload-empty-container").style.display="none";
+            let fileContiner = uploadBox.querySelectorAll(".file-container")[0];
+            uploadBox.querySelectorAll(".file-container").slice(1).forEach(container => {
+                //remove all existing containers
+                container.remove();
+            })
+            for(let i=0; i<files.length; i++){
+                let newFileContainer = fileContiner.cloneNode(true);
+                newFileContainer.querySelector(".text-200").innerHTML = files[i].name;
+                newFileContainer.style.display = "flex";
+                uploadBox.appendChild(newFileContainer);
+            }
+            jobElement.querySelector("[customID='upload-button']").addEventListener('click', function(event) {
+                event.preventDefault();
+                uploadFiles(jobElement, files);
+                document.getElementById("upload-file").value = "";
+                uploadBox.querySelector(".upload-empty-container").style.display="flex";
+            });
+        })
+    }
+});
+
 
 pageLoad();
 
