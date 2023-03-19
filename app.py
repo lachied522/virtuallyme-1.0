@@ -4,8 +4,11 @@ from sqlalchemy_utils import URLType
 from flask_cors import CORS
 
 import json
-from datetime import datetime
 import uuid
+from datetime import datetime
+
+from docx import Document
+from pdfreader import SimplePDFViewer
 
 from virtuallyme import *
 
@@ -48,6 +51,7 @@ class Task(db.Model):
     category = db.Column(db.String(100)) #task, idea, or rewrite
     created_at = db.Column(db.DateTime, default=datetime.utcnow())
     sources = db.relationship('Source', backref='sources', lazy='joined')
+    feedback = db.Column(db.String(10)) #positive or negative
     user_id = db.Column(db.String(100), db.ForeignKey('user.id'))
 
 class Source(db.Model):
@@ -105,7 +109,7 @@ def get_user():
             user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
 
         user_tasks = []
-        for task in [d for d in Task.query.filter_by(user_id=request.headers.get("member_id")).order_by(Task.created_at.desc()).limit(5).all() if d.category=="task"]:
+        for task in [d for d in Task.query.filter_by(user_id=request.headers.get("member_id")).order_by(Task.created_at).limit(5).all() if d.category=="task"]:
             sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in task.sources]
             user_tasks.append({"prompt": task.prompt, "completion": task.completion, "sources": sources})
         user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
@@ -255,7 +259,8 @@ def sync_tasks():
                 if category=="task":
                     for source in task.sources:
                         db.session.delete(source)
-                db.session.delete(task)
+                if task.feedback is None:
+                    db.session.delete(task)
             db.session.commit()
 
     return Response(status=200)
@@ -314,7 +319,7 @@ def handle_task():
         messages.append({"role": "user", "content": f"Using a high degree of variation in your structure, syntax, and semantics, write a {category} about {topic}. {additional}"})
         logit_bias = {}
 
-    completion = turbo_openai_call(messages, 1000, 1.2, 0.6, logit_bias)
+    completion = turbo_openai_call(messages, 1000, 1.2, 0.3, logit_bias)
 
     #store task data
     task = Task(prompt=f"Write a(n) {category} about {topic}.", completion=completion, category="task", user_id=user.id)
@@ -339,8 +344,7 @@ def handle_rewrite():
     """
     :param member_id: user's Memberstack ID
     :param job_id: job that the changes have been made for
-    :param type: string, type of response to generate
-    :param topic: string, subject of response
+    :param text: string, text to be rewritten
     :param additional: string, additional information user might provide
     """
     user = User.query.get(request.json["member_id"])
@@ -374,7 +378,7 @@ def handle_rewrite():
          messages.append({"role": "user", "content": f"Rewrite the following text using a high degree of variation in your structure, syntax, and semantics. {additional} Text: {text}"})
          logit_bias = {}
 
-    completion = turbo_openai_call(messages, 1000, 0.9, 0.6, logit_bias)
+    completion = turbo_openai_call(messages, 1000, 0.9, 0.3, logit_bias)
 
     #store rewrite data    
     rewrite = Task(prompt = text[:120], completion = completion, category="rewrite", user_id=user.id)
@@ -412,10 +416,18 @@ def handle_idea():
     
     db.session.commit()
 
-    return json.dumps({"completion": completion})
+    return Response(json.dumps({"completion": completion}), status=200)
 
 @app.route("/handle_feedback", methods=["GET", "POST"])
 def handle_feedback():
+    """
+    Set task feedback and update user data.
+
+    :param member_id: user's Memberstack ID
+    :param job_id: job to be shared
+    :param prompt: 
+    :param completion:
+    """
     job_id = int(request.json["job_id"])
     try:
         job = Job.query.get(job_id)
@@ -529,6 +541,50 @@ def reset_words():
     
     db.session.commit()
     return Response(status=200)
+
+@app.route('/read_files', methods=['POST'])
+def read_files():
+    files = request.files.getlist('file')
+    print([f.filename for f in files])
+    texts = []
+    for file in files:
+        extension = file.filename.split(".")[-1]
+        text = ""
+        try:
+            if extension == "docx":
+                doc = Document(file)
+                for para in doc.paragraphs:
+                    text += "\n"
+                    words = para.text.split()
+                    for word in words:
+                        if(len(text)+len(word)<8000):
+                            text += f"{word} "
+                        else:
+                            break
+                
+            elif extension == "pdf":
+                viewer = SimplePDFViewer(file)
+                for canvas in viewer:
+                    text += "\n"
+                    strings = ''.join(canvas.strings)
+                    paras = strings.split("\n")
+                    for para in paras:
+                        text += "\n"
+                        for word in para.split():
+                            if(len(text)+len(word)<8000):
+                                text += f"{word} "
+                            else:
+                                break
+            else:
+                text = "Please upload either a .docx or .pdf"
+            
+            if text != "":
+                texts.append(text.strip())
+        except:
+            return [f"Could not read file {file.filename}"]
+    
+    return Response(json.dumps({"texts": texts}), status=200)
+
 
 if __name__ == "__main__":
     app.run(debug=True)

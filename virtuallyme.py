@@ -92,10 +92,8 @@ def get_logit_bias(texts):
     for key, value in tokens_dict.items():
         bias = 3*math.log(1+value)/math.log(1+n_tokens)
         #max bias is 10
-        if bias<10:
-            tokens_dict[key] = bias
-        else:
-            tokens_dict[key] = 10
+        tokens_dict[key] = min(bias, 9)
+
 
     sorted_tokens = sorted(tokens_dict.items(), key=lambda x: x[1], reverse=True)
     #return 300 tokens with the highest bias
@@ -148,7 +146,8 @@ def construct_messages(user, samples, maxlength, current_prompt):
             break
         else:
             messages.append({"role": "assistant", "content": prompt_completion["completion"]})
-            messages.append({"role": "user", "content": "Using the idiolect, structure, syntax, reasoning, and rationale of your new persona, " + prompt_completion["prompt"]})
+            ##messages.append({"role": "user", "content": "Using the idiolect, structure, syntax, reasoning, and rationale of your new persona, " + prompt_completion["prompt"]})
+            messages.append({"role": "user", "content": "Using the idiolect, structure, syntax, reasoning, and rationale of your new persona, "})
             length += len(prompt_completion["prompt"].split())+len(prompt_completion["completion"].split())+12
     
     messages.append({"role": "system", "content": role})

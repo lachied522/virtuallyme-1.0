@@ -72,10 +72,9 @@ function updateJobWords(jobElement, value){
     }
 }
 
-function newSample(jobElement, sampleWrapper, prompt, completion){
+function newSample(jobElement, sampleWrapper, completion){
     let sampleClone = sampleWrapper.parentElement.cloneNode(true);
-    sampleClone.querySelector("[customID='sample-prompt']").innerHTML = prompt;
-    sampleClone.querySelector("[customID='sample-prompt-display']").innerHTML = prompt;
+    sampleClone.querySelector("[customID='sample-prompt-display']").innerHTML = completion.slice(0, 120);
     sampleClone.querySelector("[customID='sample-text']").innerHTML = completion;
     //add remove button functionality
     sampleClone.querySelector("[customID='remove-button']").addEventListener("click", () => {
@@ -190,7 +189,7 @@ function getUser(counter = 0){
                 let samplesGrid = newJobElement.querySelector(".samples-grid");
                 let sampleWrapper = samplesGrid.querySelector(".sample-wrapper");
                 for(let j=0; j < data.user[i].data.length; j++){
-                    samplesGrid.appendChild(newSample(newJobElement, sampleWrapper, data.user[i].data[j].prompt, data.user[i].data[j].completion));
+                    samplesGrid.appendChild(newSample(newJobElement, sampleWrapper, data.user[i].data[j].completion));
                 }
                 updateJobWords(newJobElement, data.user[i].word_count);
                 newJobElement.setAttribute("saved", "true");
@@ -304,8 +303,6 @@ function createJob(counter = 0) {
 
 function addSample(jobElement) {
     var form = jobElement.querySelector("[customID='add-sample']");
-    var typeElement = form.querySelector("[customInput='type']");
-    var topicElement = form.querySelector("[customInput='topic']");
     var textElement = form.querySelector("[customInput='text']");
 
     var wordCountElement = jobElement.querySelector("[customID='job-word-count']");
@@ -317,22 +314,11 @@ function addSample(jobElement) {
         return
     }
     
-    //check that no fields are empty
-    var empty = [];
-    if(typeElement.value.length===0){
-        empty.push(typeElement);
-    } else if(topicElement.value.length===0){
-        empty.push(topicElement);
-    } else if(textElement.value.length===0) {
-        empty.push(textElement);
-    } 
-    if(empty.length===0){
+    if(textElement.value.length>0){
         let samplesGrid = jobElement.querySelector(".samples-grid");
         let sampleWrapper = samplesGrid.querySelectorAll(".sample-wrapper")[0];
-        samplesGrid.appendChild(newSample(jobElement, sampleWrapper, `Write a(n) ${typeElement.value} about ${topicElement.value}`, textElement.value));
-        //reset elements (don't use form.reset())
-        typeElement.value = "";
-        topicElement.value = "";
+        samplesGrid.appendChild(newSample(jobElement, sampleWrapper, textElement.value));
+        //reset text elements (don't use form.reset())
         textElement.value = "";
         //increase job word count
         updateJobWords(jobElement, currentWords+newWords);
@@ -341,13 +327,46 @@ function addSample(jobElement) {
         jobElement.querySelector("[customID='saving-button']").style.display = "none";
         jobElement.querySelector("[customID='saved-button']").style.display = "none";
     } else {
-        var originalColor = empty[0].style.borderColor;
-        empty[0].style.borderColor = "#FFBEC2";
+        var originalColor = textElement.style.borderColor;
+        textElement.style.borderColor = "#FFBEC2";
         setTimeout(function() {
-            empty[0].style.borderColor = originalColor;
+            textElement.style.borderColor = originalColor;
         }, 1500);
         return
     }
+}
+
+function uploadFiles(jobElement, files) {
+    const url = "https://virtuallyme.onrender.com/read_files";
+
+    formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('file', files[i], files[i].name);
+    }
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        let samplesGrid = jobElement.querySelector(".samples-grid");
+        let sampleWrapper = samplesGrid.querySelectorAll(".sample-wrapper")[0];
+        var wordCountElement = jobElement.querySelector("[customID='job-word-count']");
+        var currentWords = parseInt(wordCountElement.innerHTML.split("/")[0]);
+        var newWords = 0;
+        for(let i=0; i<data.texts.length; i++){
+            samplesGrid.appendChild(newSample(jobElement, sampleWrapper, data.texts[i]));
+            newWords += data.texts[i].length;
+        }
+        updateJobWords(jobElement, currentWords+newWords);
+        jobElement.setAttribute("saved", "false");
+        jobElement.querySelector("[customID='save-button']").style.display = "flex";
+        jobElement.querySelector("[customID='saving-button']").style.display = "none";
+        jobElement.querySelector("[customID='saved-button']").style.display = "none";
+    })
+    .catch(error => {
+        console.log(error);
+    });
 }
 
 function removeSample(jobElement, sampleWrapper){

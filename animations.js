@@ -54,11 +54,41 @@ function popupClose(popupWrapper) {
     popupWrapper.style.display = 'none';
     popupWrapper.style.opacity = '0';
     popup.style.transform = 'scale(0.6)';
-
 }
 
 function removeSampleConfirm(sampleWrapper){
     sampleWrapper.querySelector(".btn-secondary.remove").style.display = 'none';
     sampleWrapper.querySelector(".btn-secondary.confirm").style.display = 'flex';
     sampleWrapper.querySelector(".text-200").style.display = 'block';
+}
+
+
+function featuresTaskOpen(module){
+    bodyContainer = module.querySelector(".features-task-body-container");
+    dropdownArrow = module.querySelector(".line-rounded-icon.dropdown-arrow");
+    //initial state
+    bodyContainer.style.display = "none";
+    bodyContainer.style.height = '0';
+    bodyContainer.style.transform = 'scale(0.96) translateY(20px)';
+    bodyContainer.style.opacity = '0';
+    bodyContainer.animate([
+      {
+        height: '0',
+        transform: 'scale(0.96) translateY(20px)',
+        opacity: '0',
+        display: 'block'
+      },
+      {
+        height: 'auto',
+        transform: 'scale(1.0) translateY(0)',
+        opacity: '1'
+      }
+    ], {
+      duration: 200,
+      easing: 'in-out-quad',
+      update: (animation) => {
+        const rotateAngle = -180 * animation.progress;
+        dropdownArrow.style.transform = `rotate(${rotateAngle}deg)`;
+      }
+    });
 }

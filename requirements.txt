@@ -11,3 +11,5 @@ asyncio
 scikit-learn
 google-api-python-client
 beautifulsoup4
+docx
+pdfreader
