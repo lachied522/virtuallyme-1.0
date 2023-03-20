@@ -32,6 +32,89 @@ function waiting(element) {
     }, 400);
 }
 
+function popupOpen(popupWrapper) {
+    const popup = popupWrapper.querySelector('.popup');
+  
+    // set initial state
+    popupWrapper.style.opacity = '0';
+    popup.style.transform = 'scale(0.6)';
+    
+    // show popup wrapper
+    popupWrapper.style.display = 'flex';
+  
+    // animate popup wrapper
+    popup.animate([
+      { transform: 'scale(0.6)' },
+      { transform: 'scale(1.0)' },
+    ], {
+      duration: 300,
+      easing: 'ease'
+    });
+
+    popupWrapper.animate([
+        { opacity: '0' },
+        { opacity: '1'}
+      ], {
+        duration: 200,
+        easing: 'ease'
+    });
+  
+    // set final state
+    popupWrapper.style.opacity = '1';
+    popup.style.transform = 'scale(1.0)';
+
+}
+
+function popupClose(popupWrapper) {
+    const popup = popupWrapper.querySelector('.popup');
+  
+    popup.animate([
+      { transform: 'scale(1.0)' },
+      { transform: 'scale(0.6)' }
+    ], {
+      duration: 300,
+      easing: 'ease'
+    });
+
+    popupWrapper.animate([
+        { opacity: '1' },
+        { opacity: '0' }
+      ], {
+        duration: 200,
+        easing: 'ease'
+    });
+    
+    // set final state
+    popupWrapper.style.display = 'none';
+    popupWrapper.style.opacity = '0';
+    popup.style.transform = 'scale(0.6)';
+}
+
+function removeSampleConfirm(sampleWrapper){
+    sampleWrapper.querySelector(".btn-secondary.remove").style.display = 'none';
+    sampleWrapper.querySelector(".btn-secondary.confirm").style.display = 'flex';
+    sampleWrapper.querySelector(".text-200").style.display = 'block';
+}
+
+
+function featuresTaskOpen(module){
+  bodyContainer = module.querySelector(".features-tasks-body-container");
+  dropdownArrow = module.querySelector(".dropdown-wrapper");
+  bodyContainer.classList.toggle("open");
+  dropdownArrow.classList.toggle("open");
+}
+
+function feedbackAnimation(feedbackBar, feedback){
+  feedbackBar.querySelectorAll(".feedback-button").forEach(btn => {
+      btn.style.display = "none";
+  })
+  if(feedback==="positive"){
+      feedbackBar.querySelector(".feedback-button.positive.clicked").style.display = "flex";
+  } else {
+      feedbackBar.querySelector(".feedback-button.negative.clicked").style.display = "flex";
+  }
+}
+
 function updateUserWords(value){
     userWordCount = value;
     document.querySelectorAll("[customID='user-word-count']").forEach(element => {
@@ -102,42 +185,14 @@ function newSample(jobElement, sampleWrapper, completion){
 }
 
 function storeTask(tasksContainer, data){
-    let modules = tasksContainer.querySelectorAll(".module");
-    let taskHeaders = tasksContainer.querySelectorAll("[customID='tasks-header']");
-    let taskBodies = tasksContainer.querySelectorAll("[customID='tasks-body']");
-    let sourceContainers = tasksContainer.querySelectorAll(".task-source-container");
-    if(taskBodies[0].innerHTML.trim()===""){
-        //if no existing tasks
-        tasksContainer.querySelector("[customID='empty-text']").style.display = "none";
-        modules[0].style.display = "block";
-    } else {
-        //move tasks list
-        for(let i=taskBodies.length-1; i > 0; i--){
-            taskBodies[i].innerHTML = taskBodies[i-1].innerHTML;
-            taskHeaders[i].innerHTML = taskHeaders[i-1].innerHTML;
-            if(sourceContainers.length>0){
-                sourceContainers[i].querySelectorAll(".link").forEach((link, index) => {
-                    link.parentElement.href = sourceContainers[i-1].querySelectorAll(".link")[index].href;
-                    link.innerHTML = sourceContainers[i-1].querySelectorAll(".link")[index].innerHTML;
-                    if(link.innerHTML!=""){
-                        link.parentElement.target = "_blank";
-                        link.parentElement.style.display = "block";
-                    } else {                                          
-                        link.parentElement.style.display = "none";
-                    }
-                })
-            }
-            if(taskBodies[i].innerHTML.trim()!==""){
-                //show the module if non-empty
-                modules[i].style.display = "block";
-            }
-        }
-    }
-    //set first task to the one just completed
-    taskHeaders[0].innerHTML = data.prompt;
-    taskBodies[0].innerHTML = data.completion;
-    if(sourceContainers.length>0){
-        sourceContainers[0].querySelectorAll(".link").forEach((link, index) => {
+    let module = tasksContainer.querySelectorAll(".module")[0];
+    let taskClone = module.cloneNode(true);
+
+    taskClone.querySelector("[customID='tasks-header']").innerHTML = data.prompt;
+    taskClone.querySelector("[customID='tasks-body']").innerHTML = data.completion;
+    let sourceContainer = taskClone.querySelector(".task-source-container");
+    if(sourceContainer){
+        sourceContainer.querySelectorAll(".link").forEach((link, index) => {
             if(index<data.sources.length){
                 link.parentElement.href = data.sources[index].url;
                 link.parentElement.target = "_blank";
@@ -150,7 +205,32 @@ function storeTask(tasksContainer, data){
             }
         })
     }
-}
+    taskClone.querySelector(".features-tasks-title-container").addEventListener("click", () => {
+        featuresTaskOpen(taskClone);
+    });
+    if(data.feedback){
+        if(data.feedback==="positive"){
+            feedbackAnimation(taskClone.querySelector(".feedback-bar"), "positive");
+        } else if(data.feedback==="negative") {
+            feedbackAnimation(taskClone.querySelector(".feedback-bar"), "negative");
+        }
+    } else {
+        taskClone.querySelector(".feedback-button.positive").addEventListener("click", () => {
+            feedbackAnimation(taskClone.querySelector(".feedback-bar"), "positive");
+        });
+        taskClone.querySelector(".feedback-button.negative").addEventListener("click", () => {
+            feedbackAnimation(taskClone.querySelector(".feedback-bar"), "negative");
+        });
+    }
+    taskClone.style.display = "block";
+    tasksContainer.prepend(taskClone);
+    tasksContainer.querySelector("[customID='empty-text']").style.display = "none";
+    var taskLength = tasksContainer.querySelectorAll(".module").length;
+    if(taskLength>5){
+        tasksContainer.querySelectorAll(".module")[taskLength-1].remove();
+    }
+  }
+
 
 function getUser(counter = 0){
     if(counter>=3){
@@ -194,6 +274,11 @@ function getUser(counter = 0){
                 updateJobWords(newJobElement, data.user[i].word_count);
                 newJobElement.setAttribute("saved", "true");
             }
+            if(data.user.length>0){
+                //hide welcome popup
+                document.querySelector(".welcome-popup").style.display = "none"; 
+            }
+            hidePreloader();
         })
         .catch(error => {
             console.log(error);
@@ -302,47 +387,61 @@ function createJob(counter = 0) {
 }
 
 function addSample(jobElement) {
-    var form = jobElement.querySelector("[customID='add-sample']");
-    var textElement = form.querySelector("[customInput='text']");
+    let files = document.getElementById("upload-file").files;
+    if(files.length>0){
+        uploadFiles(jobElement, files);
+        Array.from(jobElement.querySelectorAll(".file-container")).slice(1).forEach(container => {
+            container.remove();
+        });
+        document.getElementById("upload-file").value = "";
+        jobElement.querySelector(".upload-empty-container").style.display="flex";
+    } else {    
+        var form = jobElement.querySelector("[customID='add-sample']");
+        var textElement = form.querySelector("[customInput='text']");
 
-    var wordCountElement = jobElement.querySelector("[customID='job-word-count']");
-    var currentWords = parseInt(wordCountElement.innerHTML.split("/")[0]);
-    var newWords = textElement.value.split(" ").length;
+        var wordCountElement = jobElement.querySelector("[customID='job-word-count']");
+        var currentWords = parseInt(wordCountElement.innerHTML.split("/")[0]);
+        var newWords = textElement.value.split(" ").length;
 
-    if(currentWords+newWords>=jobMaxWords){
-        console.log("max words");
-        return
-    }
-    
-    if(textElement.value.length>0){
-        let samplesGrid = jobElement.querySelector(".samples-grid");
-        let sampleWrapper = samplesGrid.querySelectorAll(".sample-wrapper")[0];
-        samplesGrid.appendChild(newSample(jobElement, sampleWrapper, textElement.value));
-        //reset text elements (don't use form.reset())
-        textElement.value = "";
-        //increase job word count
-        updateJobWords(jobElement, currentWords+newWords);
-        jobElement.setAttribute("saved", "false");
-        jobElement.querySelector("[customID='save-button']").style.display = "flex";
-        jobElement.querySelector("[customID='saving-button']").style.display = "none";
-        jobElement.querySelector("[customID='saved-button']").style.display = "none";
-    } else {
-        var originalColor = textElement.style.borderColor;
-        textElement.style.borderColor = "#FFBEC2";
-        setTimeout(function() {
-            textElement.style.borderColor = originalColor;
-        }, 1500);
-        return
+        if(currentWords+newWords>=jobMaxWords){
+            console.log("max words");
+            return
+        }
+        
+        if(textElement.value.length>0){
+            let samplesGrid = jobElement.querySelector(".samples-grid");
+            let sampleWrapper = samplesGrid.querySelectorAll(".sample-wrapper")[0];
+            samplesGrid.appendChild(newSample(jobElement, sampleWrapper, textElement.value));
+            //reset text elements (don't use form.reset())
+            textElement.value = "";
+            //increase job word count
+            updateJobWords(jobElement, currentWords+newWords);
+            jobElement.setAttribute("saved", "false");
+            jobElement.querySelector("[customID='save-button']").style.display = "flex";
+            jobElement.querySelector("[customID='saving-button']").style.display = "none";
+            jobElement.querySelector("[customID='saved-button']").style.display = "none";
+        } else {
+            var originalColor = textElement.style.borderColor;
+            textElement.style.borderColor = "#FFBEC2";
+            setTimeout(function() {
+                textElement.style.borderColor = originalColor;
+            }, 1500);
+            return
+        }
     }
 }
 
 function uploadFiles(jobElement, files) {
     const url = "https://virtuallyme.onrender.com/read_files";
-
-    formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-        formData.append('file', files[i], files[i].name);
+    const accept = ["pdf", "docx"];
+    const formData = new FormData();
+    for(let i = 0; i < files.length; i++){
+        let array = files[i].name.split(".");
+        if(accept.includes(array[array.length-1])){
+            formData.append('file', files[i], files[i].name);
+        }
     }
+    jobElement.querySelector(".loading-container").style.display = "flex";
     fetch(url, {
         method: 'POST',
         body: formData
@@ -359,6 +458,7 @@ function uploadFiles(jobElement, files) {
             newWords += data.texts[i].length;
         }
         updateJobWords(jobElement, currentWords+newWords);
+        jobElement.querySelector(".loading-container").style.display = "none";
         jobElement.setAttribute("saved", "false");
         jobElement.querySelector("[customID='save-button']").style.display = "flex";
         jobElement.querySelector("[customID='saving-button']").style.display = "none";
@@ -428,7 +528,7 @@ function configTask(taskWrapper){
 
 function share(jobElement, counter=0){
     //call sync function first
-    syncJob(jobNumber);
+    //syncJob(jobNumber);
     const url = "https://virtuallyme.onrender.com/share_job";
     var form = jobElement.querySelector("[customID='share-job']");
     var body = {
@@ -485,7 +585,6 @@ function submitTask() {
     var typeElement = form.querySelector("[customInput='type']");
     var topicElement = form.querySelector("[customInput='topic']");
     var searchElement = form.querySelector("[customID='search-toggle']");
-
     //get ID of selected job
     var jobIndex = form.querySelector("[customID='user-job-list']").selectedIndex-1;
     if(jobIndex<=0||jobIndex>userJobs.length){
@@ -608,6 +707,7 @@ function generateIdeas() {
         "topic": topicElement.value
     };
     if(empty.length==0){
+        document.querySelector("[customID='idea-word-count']").innerHTML = `Word count __`;
         var destination = document.querySelector("[customID='ideas-output']");
         waiting(destination);
         isWaitingIdea = true;
@@ -674,7 +774,6 @@ function submitRewrite() {
         "text": textElement.value, 
         "additional": additionalElement.value
     };
-
     //check text element is not empty
     if(textElement.value !== ""){
         var destination = document.querySelector("[customID='rewrite-output']");
@@ -758,11 +857,6 @@ function sendFeedback(feedback){
 
 function pageLoad(){
     getUser();
-    if(userJobs.length>0){
-        //hide welcome popup
-        document.querySelector(".welcome-popup").style.display = "none"; 
-    }
-    hidePreloader();
     //add create job funcionality
     document.querySelector("[customID='create-job-button']").addEventListener("click", ()=> {
         createJob();
@@ -776,9 +870,11 @@ function pageLoad(){
         jobElement.querySelector("[customID='save-button']").addEventListener("click", () => {
             syncJob(jobElement);
         });
-
         jobElement.querySelector("[customID='share-button']").addEventListener("click", () => {
             share(jobElement);
+        });
+        jobElement.querySelector("[customID='remove-job-button']").addEventListener("click", () => {
+            removeJob(jobElement);
         });
     });
     //add functionality to task wrappers
@@ -801,10 +897,11 @@ function pageLoad(){
     });
 }
 
-document.querySelectorAll(".upload-sample-box").forEach((uploadBox, index) => {
+document.querySelectorAll("[customID='job-container']").forEach(jobElement => {
+    uploadBox = jobElement.querySelector(".upload-sample-box");
     uploadBox.addEventListener('dragover', (e) => {
         e.preventDefault();
-        uploadBox.classList.add('dragover');
+        uploadBox.parentElement.classList.add('dragover');
     });
     
     uploadBox.addEventListener('dragleave', () => {
@@ -814,35 +911,30 @@ document.querySelectorAll(".upload-sample-box").forEach((uploadBox, index) => {
     uploadBox.addEventListener('drop', (e) => {
         e.preventDefault();
         uploadBox.classList.remove('dragover');
-        uploadFiles(uploadBox, e.dataTransfer.files);
+        uploadFiles(jobElement, e.dataTransfer.files);
     });
 });
 
 document.getElementById("upload-file").addEventListener("change", () => {
     let files = document.getElementById("upload-file").files;
-    if(files.length>0){
-        document.querySelectorAll(".file-upload").forEach(jobElement => {
-            let uploadBox = jobElement.querySelector(".upload-sample-box");
-            uploadBox.querySelector(".upload-empty-container").style.display="none";
-            let fileContiner = uploadBox.querySelectorAll(".file-container")[0];
-            uploadBox.querySelectorAll(".file-container").slice(1).forEach(container => {
-                //remove all existing containers
-                container.remove();
-            })
+    document.querySelectorAll("[customID='job-container']").forEach(jobElement => {
+        let uploadBox = jobElement.querySelector(".upload-sample-box");
+        Array.from(uploadBox.querySelectorAll(".file-container")).slice(1).forEach(container => {
+            container.remove();
+        });
+        if(files.length>0){
+            let fileContainer = uploadBox.querySelectorAll(".file-container")[0];
             for(let i=0; i<files.length; i++){
-                let newFileContainer = fileContiner.cloneNode(true);
+                let newFileContainer = fileContainer.cloneNode(true);
                 newFileContainer.querySelector(".text-200").innerHTML = files[i].name;
-                newFileContainer.style.display = "flex";
+                newFileContainer.style.display = "block";
                 uploadBox.appendChild(newFileContainer);
             }
-            jobElement.querySelector("[customID='upload-button']").addEventListener('click', function(event) {
-                event.preventDefault();
-                uploadFiles(jobElement, files);
-                document.getElementById("upload-file").value = "";
-                uploadBox.querySelector(".upload-empty-container").style.display="flex";
-            });
-        })
-    }
+            uploadBox.querySelector(".upload-empty-container").style.display="none";
+        } else {
+            uploadBox.querySelector(".upload-empty-container").style.display="flex";
+        }
+    });
 });
 
 

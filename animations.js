@@ -64,31 +64,19 @@ function removeSampleConfirm(sampleWrapper){
 
 
 function featuresTaskOpen(module){
-    bodyContainer = module.querySelector(".features-task-body-container");
-    dropdownArrow = module.querySelector(".line-rounded-icon.dropdown-arrow");
-    //initial state
-    bodyContainer.style.display = "none";
-    bodyContainer.style.height = '0';
-    bodyContainer.style.transform = 'scale(0.96) translateY(20px)';
-    bodyContainer.style.opacity = '0';
-    bodyContainer.animate([
-      {
-        height: '0',
-        transform: 'scale(0.96) translateY(20px)',
-        opacity: '0',
-        display: 'block'
-      },
-      {
-        height: 'auto',
-        transform: 'scale(1.0) translateY(0)',
-        opacity: '1'
-      }
-    ], {
-      duration: 200,
-      easing: 'in-out-quad',
-      update: (animation) => {
-        const rotateAngle = -180 * animation.progress;
-        dropdownArrow.style.transform = `rotate(${rotateAngle}deg)`;
-      }
-    });
+  bodyContainer = module.querySelector(".features-tasks-body-container");
+  dropdownArrow = module.querySelector(".dropdown-wrapper");
+  bodyContainer.classList.toggle("open");
+  dropdownArrow.classList.toggle("open");
+}
+
+function feedbackAnimation(feedbackBar, feedback){
+  feedbackBar.querySelectorAll(".feedback-button").forEach(btn => {
+      btn.style.display = "none";
+  })
+  if(feedback==="positive"){
+      feedbackBar.querySelector(".feedback-button.positive.clicked").style.display = "flex";
+  } else {
+      feedbackBar.querySelector(".feedback-button.negative.clicked").style.display = "flex";
+  }
 }

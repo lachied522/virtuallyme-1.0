@@ -101,19 +101,21 @@ def get_user():
     :param member_id: user's Memberstack ID
     """
     user = User.query.get(request.headers.get("member_id"))
-    
+
     try:
         user_jobs = []
         for job in user.jobs:
             job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
             user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
-
+        
+        all_tasks = Task.query.filter_by(user_id=request.headers.get("member_id")).order_by(Task.created_at).all()
         user_tasks = []
-        for task in [d for d in Task.query.filter_by(user_id=request.headers.get("member_id")).order_by(Task.created_at).limit(5).all() if d.category=="task"]:
+        for task in [d for d in all_tasks if d.category=="task"]:
             sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in task.sources]
-            user_tasks.append({"prompt": task.prompt, "completion": task.completion, "sources": sources})
-        user_ideas = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="idea"]
-        user_rewrites = [{"prompt": d.prompt, "completion": d.completion} for d in user.tasks if d.category=="rewrite"]
+            user_tasks.append({"prompt": task.prompt, "completion": task.completion, "feedback": task.feedback, "created": str(task.created_at), "sources": sources})
+
+        user_ideas = [{"prompt": d.prompt, "completion": d.completion, "created": str(task.created_at)} for d in all_tasks if d.category=="idea"]
+        user_rewrites = [{"prompt": d.prompt, "completion": d.completion, "created": str(task.created_at)} for d in all_tasks if d.category=="rewrite"]
     except Exception as e:
         print(e)
         user_jobs = []
@@ -561,20 +563,15 @@ def read_files():
                             text += f"{word} "
                         else:
                             break
-                
             elif extension == "pdf":
                 viewer = SimplePDFViewer(file)
                 for canvas in viewer:
-                    text += "\n"
-                    strings = ''.join(canvas.strings)
-                    paras = strings.split("\n")
-                    for para in paras:
-                        text += "\n"
-                        for word in para.split():
-                            if(len(text)+len(word)<8000):
-                                text += f"{word} "
-                            else:
-                                break
+                    text = ''.join(canvas.strings)
+                    for word in text.split():
+                        if(len(text)+len(word)<8000):
+                            text += f"{word} "
+                        else:
+                            break
             else:
                 text = "Please upload either a .docx or .pdf"
             
