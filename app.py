@@ -78,7 +78,7 @@ def add_cors_headers(response):
 
 @app.route("/javascript", methods=["GET"])
 def serve_js():
-    return send_from_directory(".", "javascript.js")
+    return send_from_directory(".", "javascript_copy.js")
 
 @app.route("/create_user", methods=["POST"])
 def create_user():
@@ -380,7 +380,7 @@ def handle_rewrite():
          messages.append({"role": "user", "content": f"Rewrite the following text using a high degree of variation in your structure, syntax, and semantics. {additional} Text: {text}"})
          logit_bias = {}
 
-    completion = turbo_openai_call(messages, 1000, 0.9, 0.3, logit_bias)
+    completion = turbo_openai_call(messages, 1000, 1.2, 0.3, logit_bias)
 
     #store rewrite data    
     rewrite = Task(prompt = text[:120], completion = completion, category="rewrite", user_id=user.id)

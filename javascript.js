@@ -223,10 +223,11 @@ function storeTask(tasksContainer, data){
         });
     }
     taskClone.style.display = "block";
-    tasksContainer.prepend(taskClone);
+    module.after(taskClone);
+    //tasksContainer.prepend(taskClone);
     tasksContainer.querySelector("[customID='empty-text']").style.display = "none";
     var taskLength = tasksContainer.querySelectorAll(".module").length;
-    if(taskLength>5){
+    if(taskLength-1>5){
         tasksContainer.querySelectorAll(".module")[taskLength-1].remove();
     }
   }
@@ -878,7 +879,7 @@ function pageLoad(){
         });
     });
     //add functionality to task wrappers
-    document.querySelectorAll(".task-wrapper").forEach(taskElement => {
+    document.querySelectorAll("[customID='submit-task']").forEach(taskElement => {
         configTask(taskElement);
     });
     //add search toggle functionality
@@ -895,50 +896,60 @@ function pageLoad(){
     document.querySelector("[customID='negative-feedback-button']").addEventListener("click", function() {
         sendFeedback('negative');
     });
+    document.querySelectorAll("[customID='job-container']").forEach(jobElement => {
+        uploadBox = jobElement.querySelector(".upload-sample-box");
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.parentElement.classList.add('dragover');
+        });
+        
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
+        });
+    
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            uploadFiles(jobElement, e.dataTransfer.files);
+        });
+    });
+    document.getElementById("upload-file").addEventListener("change", () => {
+        let files = document.getElementById("upload-file").files;
+        document.querySelectorAll("[customID='job-container']").forEach(jobElement => {
+            let uploadBox = jobElement.querySelector(".upload-sample-box");
+            Array.from(uploadBox.querySelectorAll(".file-container")).slice(1).forEach(container => {
+                container.remove();
+            });
+            if(files.length>0){
+                let fileContainer = uploadBox.querySelectorAll(".file-container")[0];
+                for(let i=0; i<files.length; i++){
+                    let newFileContainer = fileContainer.cloneNode(true);
+                    newFileContainer.querySelector(".text-200").innerHTML = files[i].name;
+                    newFileContainer.style.display = "block";
+                    uploadBox.appendChild(newFileContainer);
+                }
+                uploadBox.querySelector(".upload-empty-container").style.display="none";
+            } else {
+                uploadBox.querySelector(".upload-empty-container").style.display="flex";
+            }
+        });
+    });
+    //periodically save jobs    
+    setInterval(()=>{
+        document.querySelectorAll("[customID='job-container']").forEach(jobElement => {
+            if(jobElement.hasAttribute("saved")){
+                if(jobElement.getAttribute("saved")==="false"){
+                    syncJob(jobElement);
+                }
+            }
+        })
+    }, 60000)
 }
 
-document.querySelectorAll("[customID='job-container']").forEach(jobElement => {
-    uploadBox = jobElement.querySelector(".upload-sample-box");
-    uploadBox.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadBox.parentElement.classList.add('dragover');
-    });
-    
-    uploadBox.addEventListener('dragleave', () => {
-        uploadBox.classList.remove('dragover');
-    });
 
-    uploadBox.addEventListener('drop', (e) => {
-        e.preventDefault();
-        uploadBox.classList.remove('dragover');
-        uploadFiles(jobElement, e.dataTransfer.files);
-    });
+document.addEventListener("DOMContentLoaded", () => {
+    pageLoad();
 });
-
-document.getElementById("upload-file").addEventListener("change", () => {
-    let files = document.getElementById("upload-file").files;
-    document.querySelectorAll("[customID='job-container']").forEach(jobElement => {
-        let uploadBox = jobElement.querySelector(".upload-sample-box");
-        Array.from(uploadBox.querySelectorAll(".file-container")).slice(1).forEach(container => {
-            container.remove();
-        });
-        if(files.length>0){
-            let fileContainer = uploadBox.querySelectorAll(".file-container")[0];
-            for(let i=0; i<files.length; i++){
-                let newFileContainer = fileContainer.cloneNode(true);
-                newFileContainer.querySelector(".text-200").innerHTML = files[i].name;
-                newFileContainer.style.display = "block";
-                uploadBox.appendChild(newFileContainer);
-            }
-            uploadBox.querySelector(".upload-empty-container").style.display="none";
-        } else {
-            uploadBox.querySelector(".upload-empty-container").style.display="flex";
-        }
-    });
-});
-
-
-pageLoad();
 
 let isWaiting = false;
 let isWaitingRewrite = false;
