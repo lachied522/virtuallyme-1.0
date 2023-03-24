@@ -11,6 +11,9 @@ from datetime import datetime
 
 from virtuallyme import *
 
+from docx import Document
+from pdfreader import SimplePDFViewer
+
 DATABASE_URL = "postgresql://virtuallyme_db_user:V3qyWKGBmuwpH0To2o5eVkqa1X4nqMhR@dpg-cfskiiarrk00vm1bp320-a.singapore-postgres.render.com/virtuallyme_db" #external
 
 app = Flask(__name__)
@@ -28,7 +31,7 @@ class User(db.Model):
     name = db.Column(db.String(100))
     about = db.Column(db.Text)
     description = db.Column(db.Text)
-    monthly_words = db.Column(db.Integer)
+    monthly_words = db.Column(db.Integer, default=0)
     jobs = db.relationship('Job', backref='user', lazy='joined')
     tasks = db.relationship('Task', backref='user', lazy='joined')
 
@@ -50,10 +53,11 @@ class Task(db.Model):
     prompt = db.Column(db.Text)
     completion = db.Column(db.Text)
     category = db.Column(db.String(100)) #task, idea, or rewrite
-    created_at = db.Column(db.DateTime, default=datetime.utcnow())
+    created_at = db.Column(db.DateTime(timezone=True), default=datetime.now())
     sources = db.relationship('Source', backref='sources', lazy='joined')
     feedback = db.Column(db.String(10)) #positive or negative
     user_id = db.Column(db.String(100), db.ForeignKey('user.id'))
+    job_id = db.Column(db.String(100), db.ForeignKey('job.id'))
 
 class Source(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -101,32 +105,35 @@ def get_user():
     :param member_id: user's Memberstack ID
     """
     user = User.query.get(request.headers.get("member_id"))
+    try:
+        user_jobs = []
+        for job in user.jobs:
+            job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
+            user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
+        
+        all_tasks = Task.query.filter_by(user_id=request.headers.get("member_id")).order_by(Task.created_at).all()
+        user_tasks = []
+        for task in [d for d in all_tasks if d.category=="task"]:
+            sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in task.sources]
+            user_tasks.append({"prompt": task.prompt, "completion": task.completion, "feedback": task.feedback, "created": str(task.created_at), "sources": sources})
 
-    user_jobs = []
-    for job in user.jobs:
-        job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
-        user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
-    
-    all_tasks = Task.query.filter_by(user_id=request.headers.get("member_id")).order_by(Task.created_at).all()
-    user_tasks = []
-    for task in [d for d in all_tasks if d.category=="task"]:
-        sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in task.sources]
-        user_tasks.append({"prompt": task.prompt, "completion": task.completion, "feedback": task.feedback, "created": str(task.created_at), "sources": sources})
+        user_ideas = [{"prompt": d.prompt, "completion": d.completion, "created": str(task.created_at)} for d in all_tasks if d.category=="idea"]
+        user_rewrites = [{"prompt": d.prompt, "completion": d.completion, "created": str(task.created_at)} for d in all_tasks if d.category=="rewrite"]
 
-    user_ideas = [{"prompt": d.prompt, "completion": d.completion, "created": str(task.created_at)} for d in all_tasks if d.category=="idea"]
-    user_rewrites = [{"prompt": d.prompt, "completion": d.completion, "created": str(task.created_at)} for d in all_tasks if d.category=="rewrite"]
+        response_dict = {
+            "description": user.description or "",
+            "about": user.about or "",
+            "words": user.monthly_words or 0,
+            "user": user_jobs,
+            "tasks": user_tasks[::-1],
+            "ideas": user_ideas[::-1],
+            "rewrites": user_rewrites[::-1]
+        }
 
-    response_dict = {
-        "description": user.description or "",
-        "about": user.about or "",
-        "words": user.monthly_words or 0,
-        "user": user_jobs,
-        "tasks": user_tasks,
-        "ideas": user_ideas,
-        "rewrites": user_rewrites
-    }
-
-    return Response(json.dumps(response_dict), status=200)
+        return Response(json.dumps(response_dict), status=200)
+    except Exception as e:
+        print(e)
+        return Response(status=400)
 
 @app.route("/get_data", methods=["GET"])
 def get_data():
@@ -249,14 +256,6 @@ def sync_job():
         #update user description
         user.description = description
 
-        #pass decsription to Zapier
-        url = "https://hooks.zapier.com/hooks/catch/14316057/bvhzkww/"
-        response_dictionary = {
-            "webflow_member_ID": user.id,
-            "description": description
-        }
-        response = requests.post(url, data=json.dumps(response_dictionary))
-
     #update user record
     if job.name != request.json["job_name"]:
         job.name = request.json["job_name"]
@@ -291,6 +290,7 @@ def store_task():
     category = request.json["category"]
     prompt = request.json["prompt"]
     completion = request.json["completion"]
+    job = request.json["job_id"]
     sources = []
 
     if category=="task":
@@ -300,7 +300,7 @@ def store_task():
             for source in sources:
                 db.session.add(Source(url=source["url"], display=source["display"], title=source["title"], preview=source["preview"], task_id=task.id))
 
-    db.session.add(Task(prompt=prompt, completion=completion, category=category, sources=sources, user_id=user.id))
+    db.session.add(Task(prompt=prompt, completion=completion, category=category, sources=sources, user_id=user.id, job_id=job))
     #update user word count
     user.monthly_words += len(completion.split())
     db.session.commit()
@@ -314,22 +314,34 @@ def handle_feedback():
     Set task feedback and update user data.
 
     :param member_id: user's Memberstack ID
-    :param job_id: job to be shared
-    :param prompt: 
-    :param completion:
+    :param feedback: 'positive' or 'negative'
+    :param completion: identify task by completion
     """
-    job_id = int(request.json["job_id"])
+    ##job_id = int(request.json["job_id"])
     try:
-        job = Job.query.get(job_id)
-        prompt = request.json["prompt"]
+        user = User.query.get(request.json["member_id"])
         completion = request.json["completion"]
-        feedback = request.json["feedback"]
+        feedback = request.json["feedback"] #positive or negative
 
-        db.session.add(Data(prompt=prompt, completion=completion, feedback=feedback, job_id=job.id))
-        db.session.commit()
-    except:
-        #if job number not specified, do nothing
-        pass
+        #get all user tasks, ordered by created at column
+        all_tasks = Task.query.filter_by(user_id=request.headers.get("member_id")).order_by(Task.created_at).all()
+        for task in all_tasks:
+            if task.completion == completion:
+                #add feedback to task record
+                task.feedback = feedback
+                job_id = task.job_id #job for which task was generated
+                
+                if job_id is not None and isinstance(job_id, int):
+                    if job_id>0:
+                        #create new data record in DB
+                        prompt = task.prompt
+                        db.session.add(Data(prompt=prompt, completion=completion, feedback=feedback, job_id=job_id))
+
+                db.session.commit()
+                break            
+
+    except Exception as e:
+        print(e)
     
     return Response(status=200)
 
@@ -381,7 +393,8 @@ def read_files():
             
             if text != "":
                 texts.append(text.strip())
-        except:
+        except Exception as e:
+            print(e)
             return [f"Could not read file {file.filename}"]
     
     return Response(json.dumps({"texts": texts}), status=200)
