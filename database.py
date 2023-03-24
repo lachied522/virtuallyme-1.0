@@ -286,12 +286,22 @@ def sync_tasks():
 
 @app.route("/store_task", methods=["POST"])
 def store_task():
+    """
+    :param member_id:
+    :param category:
+    :param prompt:
+    :param completion:
+    :param job_id:
+    """
     user = User.query.get(request.json["member_id"])
     category = request.json["category"]
     prompt = request.json["prompt"]
     completion = request.json["completion"]
     job = request.json["job_id"]
     sources = []
+
+    task = Task(prompt=prompt, completion=completion, category=category, sources=sources, user_id=user.id, job_id=job)
+    db.session.add(task)
 
     if category=="task":
         if "sources" in request.json:
@@ -300,7 +310,7 @@ def store_task():
             for source in sources:
                 db.session.add(Source(url=source["url"], display=source["display"], title=source["title"], preview=source["preview"], task_id=task.id))
 
-    db.session.add(Task(prompt=prompt, completion=completion, category=category, sources=sources, user_id=user.id, job_id=job))
+    
     #update user word count
     user.monthly_words += len(completion.split())
     db.session.commit()
@@ -324,7 +334,7 @@ def handle_feedback():
         feedback = request.json["feedback"] #positive or negative
 
         #get all user tasks, ordered by created at column
-        all_tasks = Task.query.filter_by(user_id=request.headers.get("member_id")).order_by(Task.created_at).all()
+        all_tasks = Task.query.filter_by(user_id=request.json["member_id"]).order_by(Task.created_at).all()
         for task in all_tasks:
             if task.completion == completion:
                 #add feedback to task record
