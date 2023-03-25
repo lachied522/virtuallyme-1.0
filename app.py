@@ -377,8 +377,8 @@ def handle_rewrite():
         messages.append({"role": "user", "content": f"Rewrite the following text using the same persona, structure, syntax, word choices, reasoning, and rationale used above. {additional} Text: {text}"})
         logit_bias = get_logit_bias([d["content"] for d in messages if d["role"]=="assistant"])
     else:
-         messages.append({"role": "user", "content": f"Rewrite the following text using a high degree of variation in your structure, syntax, and semantics. {additional} Text: {text}"})
-         logit_bias = {}
+        messages.append({"role": "user", "content": f"Rewrite the following text using a high degree of variation in your structure, syntax, and semantics. {additional} Text: {text}"})
+        logit_bias = {}
 
     completion = turbo_openai_call(messages, 1000, 1.2, 0.3, logit_bias)
 

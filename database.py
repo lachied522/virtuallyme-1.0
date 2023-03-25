@@ -52,7 +52,7 @@ class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     prompt = db.Column(db.Text)
     completion = db.Column(db.Text)
-    category = db.Column(db.String(100)) #task, idea, or rewrite
+    category = db.Column(db.String(100)) #task, question, idea, or rewrite
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now())
     sources = db.relationship('Source', backref='sources', lazy='joined')
     feedback = db.Column(db.String(10)) #positive or negative
@@ -116,9 +116,14 @@ def get_user():
         for task in [d for d in all_tasks if d.category=="task"]:
             sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in task.sources]
             user_tasks.append({"prompt": task.prompt, "completion": task.completion, "feedback": task.feedback, "created": str(task.created_at), "sources": sources})
+        
+        user_questions = []
+        for question in [d for d in all_tasks if d.category=="question"]:
+            sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in question.sources]
+            user_questions.append({"prompt": question.prompt, "completion": question.completion, "feedback": question.feedback, "created": str(question.created_at), "sources": sources})
 
-        user_ideas = [{"prompt": d.prompt, "completion": d.completion, "created": str(task.created_at)} for d in all_tasks if d.category=="idea"]
-        user_rewrites = [{"prompt": d.prompt, "completion": d.completion, "created": str(task.created_at)} for d in all_tasks if d.category=="rewrite"]
+        user_ideas = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback, "created": str(d.created_at)} for d in all_tasks if d.category=="idea"]
+        user_rewrites = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback, "created": str(d.created_at)} for d in all_tasks if d.category=="rewrite"]
 
         response_dict = {
             "description": user.description or "",
@@ -126,6 +131,7 @@ def get_user():
             "words": user.monthly_words or 0,
             "user": user_jobs,
             "tasks": user_tasks[::-1],
+            "questions": user_questions[::-1],
             "ideas": user_ideas[::-1],
             "rewrites": user_rewrites[::-1]
         }
@@ -303,7 +309,7 @@ def store_task():
     task = Task(prompt=prompt, completion=completion, category=category, sources=sources, user_id=user.id, job_id=job)
     db.session.add(task)
 
-    if category=="task":
+    if category=="task" or category=="question":
         if "sources" in request.json:
             sources = request.json["sources"]
             db.session.flush() #flush session to obtain task id
