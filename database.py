@@ -54,6 +54,7 @@ class Task(db.Model):
     completion = db.Column(db.Text)
     category = db.Column(db.String(100)) #task, question, idea, or rewrite
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now())
+    score = db.Column(db.Integer)
     sources = db.relationship('Source', backref='sources', lazy='joined')
     feedback = db.Column(db.String(10)) #positive or negative
     user_id = db.Column(db.String(100), db.ForeignKey('user.id'))
@@ -115,15 +116,15 @@ def get_user():
         user_tasks = []
         for task in [d for d in all_tasks if d.category=="task"]:
             sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in task.sources]
-            user_tasks.append({"prompt": task.prompt, "completion": task.completion, "feedback": task.feedback, "created": str(task.created_at), "sources": sources})
+            user_tasks.append({"prompt": task.prompt, "completion": task.completion, "feedback": task.feedback, "score": task.score, "created": str(task.created_at), "sources": sources})
         
         user_questions = []
         for question in [d for d in all_tasks if d.category=="question"]:
             sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in question.sources]
-            user_questions.append({"prompt": question.prompt, "completion": question.completion, "feedback": question.feedback, "created": str(question.created_at), "sources": sources})
+            user_questions.append({"prompt": question.prompt, "completion": question.completion, "feedback": question.feedback, "score": question.score, "created": str(question.created_at), "sources": sources})
 
-        user_ideas = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback, "created": str(d.created_at)} for d in all_tasks if d.category=="idea"]
-        user_rewrites = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback, "created": str(d.created_at)} for d in all_tasks if d.category=="rewrite"]
+        user_ideas = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback, "score": d.score, "created": str(d.created_at)} for d in all_tasks if d.category=="idea"]
+        user_rewrites = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback, "score": d.score, "created": str(d.created_at)} for d in all_tasks if d.category=="rewrite"]
 
         response_dict = {
             "description": user.description or "",
@@ -191,16 +192,19 @@ def remove_job():
     :param member_id: member that job belonds to
     :param job_id: job to be removed
     """
-    user = User.query.get(request.json["member_id"])
-    job = Job.query.get(request.json["job_id"])
-    
-    for d in job.data:
-        db.session.delete(d)
-    
-    db.session.delete(job)
+    try:
+        user = User.query.get(request.json["member_id"])
+        job = Job.query.get(request.json["job_id"])
+        
+        for d in job.data:
+            db.session.delete(d)
+        
+        db.session.delete(job)
 
-    db.session.commit()
-    return Response(status=200)
+        db.session.commit()
+        return Response(status=200)
+    except:
+        return Response(status=200)
 
 
 @app.route("/sync_job", methods=["POST"])
@@ -297,16 +301,17 @@ def store_task():
     :param category:
     :param prompt:
     :param completion:
+    :param score:
     :param job_id:
     """
     user = User.query.get(request.json["member_id"])
     category = request.json["category"]
     prompt = request.json["prompt"]
     completion = request.json["completion"]
+    score = request.json["score"]
     job = request.json["job_id"]
-    sources = []
 
-    task = Task(prompt=prompt, completion=completion, category=category, sources=sources, user_id=user.id, job_id=job)
+    task = Task(prompt=prompt, completion=completion, category=category, score=score, user_id=user.id, job_id=job)
     db.session.add(task)
 
     if category=="task" or category=="question":
@@ -345,13 +350,14 @@ def handle_feedback():
             if task.completion == completion:
                 #add feedback to task record
                 task.feedback = feedback
-                job_id = task.job_id #job for which task was generated
-                
-                if job_id is not None and isinstance(job_id, int):
-                    if job_id>0:
-                        #create new data record in DB
-                        prompt = task.prompt
-                        db.session.add(Data(prompt=prompt, completion=completion, feedback=feedback, job_id=job_id))
+                if feedback in ["positive", "negative"]:
+                    job_id = task.job_id #job for which task was generated
+                    
+                    if job_id is not None and isinstance(job_id, int):
+                        if job_id>0:
+                            #create new data record in DB
+                            prompt = task.prompt
+                            db.session.add(Data(prompt=prompt, completion=completion, feedback=feedback, job_id=job_id))
 
                 db.session.commit()
                 break            
@@ -405,7 +411,7 @@ def read_files():
                         else:
                             break
             else:
-                text = "Please upload either a .docx or .pdf"
+                text = "Unsupported filetype"
             
             if text != "":
                 texts.append(text.strip())
