@@ -153,20 +153,24 @@ def get_data():
     try:
         user = User.query.get(request.headers.get("member_id"))
         job_id = int(request.headers.get("job_id"))
+
+        description = user.description
+
         if job_id <= 0:
             #combine all job data
-            samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
+            samples = [{"completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
         elif job_id > 0:
             job = Job.query.get(job_id)
             #get job data
-            samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for d in job.data]
+            samples = [{"completion": d.completion, "feedback": d.feedback} for d in job.data]
         else:
             samples = []
     except Exception as e:
         print(e)
         #no job data
+        description = ""
         samples = []
-    return Response(json.dumps({"samples": samples}), status=200)
+    return Response(json.dumps({"samples": samples, "description": description}), status=200)
 
 @app.route("/create_job", methods=["POST"])
 def create_job():
@@ -203,7 +207,8 @@ def remove_job():
 
         db.session.commit()
         return Response(status=200)
-    except:
+    except Exception as e:
+        print(e)
         return Response(status=200)
 
 
@@ -363,9 +368,8 @@ def handle_feedback():
                 break            
 
     except Exception as e:
-        print(e)
-    
-    return Response(status=200)
+        print(e) 
+        return Response(status=500)
 
 
 
