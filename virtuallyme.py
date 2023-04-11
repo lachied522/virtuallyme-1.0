@@ -15,7 +15,7 @@ openai.api_key = OPENAI_API_KEY
 #initialise encoding
 enc = tiktoken.get_encoding("cl100k_base")
 
-def turbo_openai_call(messages, max_tokens, temperature, presence_penalty, logit_bias={}):
+def turbo_openai_call(messages, max_tokens, temperature=0, presence_penalty=0, logit_bias={}):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=messages,
@@ -26,31 +26,31 @@ def turbo_openai_call(messages, max_tokens, temperature, presence_penalty, logit
     )
     return response["choices"][0]["message"]["content"].strip()
 
-def openai_call(prompt, max_tokens, temperature, presence_penalty):
+def openai_call(prompts, max_tokens, temperature=0, presence_penalty=0):
+    responses = []
     try:
         model='text-davinci-003'
         response = openai.Completion.create(
             model=model,
-            prompt=prompt,
+            prompt=prompts,
             max_tokens=max_tokens,
             temperature=temperature,
             presence_penalty=presence_penalty,
             stop=[" Me", " AI:"]
         )
-        print(model)
     except:
         model='text-davinci-002'
         response = openai.Completion.create(
             model=model,
-            prompt=prompt,
+            prompt=prompts,
             max_tokens=temperature,
             temperature=temperature,
             presence_penalty=presence_penalty,
             stop=[" Me", " AI:"]
         )
-        print(model)
-    response_text = response.choices[0].text.strip()
-    return response_text
+    for choice in response.choices:
+        responses.append(choice.text.strip())
+    return responses
 
 def num_tokens(text):
     '''
@@ -67,12 +67,6 @@ def get_logit_bias(texts):
 
     :param texts: list of strings
     '''
-    BLACKLIST = ['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'I', 
-                'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at', 
-                'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 
-                'she', 'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 
-                'their', 'what', 'so', 'up', 'out', 'if', 'about', 'who', 'get', 
-                'which', 'go', 'me', 'when', 'can', 'like', 'no'] #words we do not want to influence bias of
 
     n_tokens = 0
     tokens_dict = {}

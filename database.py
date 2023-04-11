@@ -52,7 +52,7 @@ class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     prompt = db.Column(db.Text)
     completion = db.Column(db.Text)
-    category = db.Column(db.String(100)) #task, question, idea, or rewrite
+    category = db.Column(db.String(100)) #task, question, idea, rewrite, or composition
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now())
     score = db.Column(db.Integer)
     sources = db.relationship('Source', backref='sources', lazy='joined')
@@ -125,6 +125,7 @@ def get_user():
 
         user_ideas = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback, "score": d.score, "created": str(d.created_at)} for d in all_tasks if d.category=="idea"]
         user_rewrites = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback, "score": d.score, "created": str(d.created_at)} for d in all_tasks if d.category=="rewrite"]
+        user_compositions = [{"prompt": d.prompt, "completion": d.completion, "score": d.score, "created": str(d.created_at)} for d in all_tasks if d.category=="composition"]
 
         response_dict = {
             "description": user.description or "",
@@ -134,7 +135,8 @@ def get_user():
             "tasks": user_tasks[::-1],
             "questions": user_questions[::-1],
             "ideas": user_ideas[::-1],
-            "rewrites": user_rewrites[::-1]
+            "rewrites": user_rewrites[::-1],
+            "compositions": user_compositions[::-1]
         }
 
         return Response(json.dumps(response_dict), status=200)
@@ -154,7 +156,9 @@ def get_data():
         user = User.query.get(request.headers.get("member_id"))
         job_id = int(request.headers.get("job_id"))
 
+        name = user.name
         description = user.description
+        about = user.about
 
         if job_id <= 0:
             #combine all job data
@@ -168,9 +172,9 @@ def get_data():
     except Exception as e:
         print(e)
         #no job data
-        description = ""
-        samples = []
-    return Response(json.dumps({"samples": samples, "description": description}), status=200)
+        return Response(status=500)
+    
+    return Response(json.dumps({"name": name, "description": description, "about": about, "samples": samples}), status=200)
 
 @app.route("/create_job", methods=["POST"])
 def create_job():
@@ -261,15 +265,17 @@ def sync_job():
     existing_samples_str = str("\n".join(sort_samples(existing_samples)))[:8000]
 
     #only consider first 8,000 characters ~ 2000 words
-    if len(all_samples_str.split()) > 300 and all_samples_str!=existing_samples_str:
-        try:
-            messages = [{"role": "user", "content": f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of your writing style, language, audience, semantics, syntax. Speak in first person."}]
-            description = turbo_openai_call(messages, 500, 0.4, 0.3)
-        except:
-            prompt = f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of your writing style, language, auidence, semantics, syntax. Speak in first person."
-            description = openai_call(prompt, 500, 0.4, 0.3)
+    #if len(all_samples_str.split()) > 300 and all_samples_str != existing_samples_str:
+    if True:
+        prompts = [
+            f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of your writing style, audience, semantics, syntax. If the language is English, what type of English is it? Speak in first person.",
+            f"The following text was written by a human.\nText: {all_samples_str}\nGive an in-depth description of who you believe this person is, including their demographic and likely occupation. What values and beliefs does this person hold? Speak in first person."
+        ]
+        description, about = openai_call(prompts, 450, 0.3, 0.1)
+
         #update user description
         user.description = description
+        user.about = about
 
     #update user record
     if job.name != request.json["job_name"]:
@@ -332,6 +338,29 @@ def store_task():
     db.session.commit()
     return Response(status=200)
 
+@app.route("/remove_task", methods=["POST"])
+def remove_task():
+    """
+    Remove a task from DB. Used primarily for compositions.
+    :param member_id:
+    :param completion:
+    """
+    try:
+        user = User.query.get(request.json["member_id"])
+        completion = request.json["completion"]
+
+        #get all user tasks, ordered by created at column
+        all_tasks = Task.query.filter_by(user_id=request.json["member_id"]).order_by(Task.created_at).all()
+        for task in all_tasks:
+            if task.completion == completion:
+                db.session.delete(task)
+                db.session.commit()
+                break            
+
+        return Response(status=200)
+    except Exception as e:
+        print(e) 
+        return Response(status=500)
 
 
 @app.route("/handle_feedback", methods=["GET", "POST"])
@@ -343,7 +372,6 @@ def handle_feedback():
     :param feedback: 'positive' or 'negative'
     :param completion: identify task by completion
     """
-    ##job_id = int(request.json["job_id"])
     try:
         user = User.query.get(request.json["member_id"])
         completion = request.json["completion"]
@@ -365,13 +393,25 @@ def handle_feedback():
                             db.session.add(Data(prompt=prompt, completion=completion, feedback=feedback, job_id=job_id))
 
                 db.session.commit()
-                break            
+                break
 
+        return Response(status=200)    
     except Exception as e:
         print(e) 
         return Response(status=500)
 
+@app.route("/update_user_words", methods=["POST"])
+def update_user_words():
+    """
+    increment user monthly word by value
+    :param member_id: user's Memberstack ID
+    :param value: number of words to increment by
+    """
+    user = User.query.get(request.json["member_id"])
 
+    user.monthly_words += request.json["value"]
+    db.session.commit()
+    return Response(status=200)
 
 @app.route("/reset_monthly_words", methods=["GET"])
 def reset_words():
