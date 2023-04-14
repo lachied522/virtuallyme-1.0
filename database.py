@@ -265,13 +265,12 @@ def sync_job():
     existing_samples_str = str("\n".join(sort_samples(existing_samples)))[:8000]
 
     #only consider first 8,000 characters ~ 2000 words
-    #if len(all_samples_str.split()) > 300 and all_samples_str != existing_samples_str:
-    if True:
+    if len(all_samples_str.split()) > 300 and all_samples_str != existing_samples_str:
         prompts = [
             f"Pretend the following text was written by you.\nText: {all_samples_str}\nGive an elaborate description of your writing style, audience, semantics, syntax. If the language is English, what type of English is it? Speak in first person.",
             f"The following text was written by a human.\nText: {all_samples_str}\nGive an in-depth description of who you believe this person is, including their demographic and likely occupation. What values and beliefs does this person hold? Speak in first person."
         ]
-        description, about = openai_call(prompts, 450, 0.3, 0.1)
+        description, about = openai_call(prompts, 400, 0.3, 0.1)
 
         #update user description
         user.description = description
