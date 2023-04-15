@@ -427,42 +427,42 @@ def reset_words():
 
 @app.route('/read_files', methods=['POST'])
 def read_files():
+    MIN_CHARACTERS = 20 #prevent non-meaningful samples
+    MAX_CHARACTERS = 8000
     files = request.files.getlist('file')
-    print([f.filename for f in files])
-    texts = []
+    samples = [""]
     for file in files:
         extension = file.filename.split(".")[-1]
-        text = ""
         try:
             if extension == "docx":
                 doc = Document(file)
                 for para in doc.paragraphs:
-                    text += "\n"
                     words = para.text.split()
                     for word in words:
-                        if(len(text)+len(word)<8000):
-                            text += f"{word} "
+                        text = samples[-1]
+                        if len(text) + len(word) < MAX_CHARACTERS:
+                            samples[-1] += f"{word} "
                         else:
-                            break
+                            samples.append(word)
+
             elif extension == "pdf":
                 viewer = SimplePDFViewer(file)
                 for canvas in viewer:
-                    text = ''.join(canvas.strings)
-                    for word in text.split():
-                        if(len(text)+len(word)<8000):
-                            text += f"{word} "
+                    words = ''.join(canvas.strings)
+                    for word in words.split():
+                        text = samples[-1]
+                        if len(text) + len(word) < MAX_CHARACTERS :
+                            samples[-1] += f"{word} "
                         else:
-                            break
+                            samples.append(word)
             else:
-                text = "Unsupported filetype"
+                samples.append("Unsupported filetype")
             
-            if text != "":
-                texts.append(text.strip())
         except Exception as e:
             print(e)
             return [f"Could not read file {file.filename}"]
     
-    return Response(json.dumps({"texts": texts}), status=200)
+    return Response(json.dumps({"texts": [s for s in samples if len(s)>MIN_CHARACTERS]}), status=200)
 
 
 
