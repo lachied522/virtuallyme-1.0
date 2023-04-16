@@ -5,6 +5,9 @@ from flask_cors import CORS
 
 import psycopg2
 
+from apscheduler.schedulers.background import BackgroundScheduler
+
+import os
 import json
 import uuid
 from datetime import datetime
@@ -14,7 +17,8 @@ from virtuallyme import *
 from docx import Document
 from pdfreader import SimplePDFViewer
 
-DATABASE_URL = "postgresql://virtuallyme_db_user:V3qyWKGBmuwpH0To2o5eVkqa1X4nqMhR@dpg-cfskiiarrk00vm1bp320-a.singapore-postgres.render.com/virtuallyme_db" #external
+#DATABASE_URL = "postgresql://virtuallyme_db_user:V3qyWKGBmuwpH0To2o5eVkqa1X4nqMhR@dpg-cfskiiarrk00vm1bp320-a.singapore-postgres.render.com/virtuallyme_db" #external
+DATABASE_URL = os.getenv("DATABASE_URL") #internal
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -132,11 +136,11 @@ def get_user():
             "about": user.about or "",
             "words": user.monthly_words or 0,
             "user": user_jobs,
-            "tasks": user_tasks[::-1],
-            "questions": user_questions[::-1],
-            "ideas": user_ideas[::-1],
-            "rewrites": user_rewrites[::-1],
-            "compositions": user_compositions[::-1]
+            "tasks": user_tasks,
+            "questions": user_questions,
+            "ideas": user_ideas,
+            "rewrites": user_rewrites,
+            "compositions": user_compositions
         }
 
         return Response(json.dumps(response_dict), status=200)
@@ -285,25 +289,6 @@ def sync_job():
     db.session.commit()
     return Response(status=200)
 
-
-@app.route("/sync_tasks", methods=["POST"])
-def sync_tasks():
-    user = User.query.get(request.json["member_id"])
-    categories = list(set([str(d.category) for d in user.tasks])) #task, idea, rewrite
-
-    for category in categories:
-        tasks = [d for d in user.tasks if d.category==category]
-        if len(tasks)>5:
-            for task in tasks[5:]:
-                if category=="task":
-                    for source in task.sources:
-                        db.session.delete(source)
-                if task.feedback is None:
-                    db.session.delete(task)
-            db.session.commit()
-
-    return Response(status=200)
-
 @app.route("/store_task", methods=["POST"])
 def store_task():
     """
@@ -412,21 +397,55 @@ def update_user_words():
     db.session.commit()
     return Response(status=200)
 
-@app.route("/reset_monthly_words", methods=["GET"])
+def sync_tasks():
+    """
+    Called at end of each day to purge unnecessary tasks
+    """
+    try:
+        with app.app_context():
+            users = User.query.all()
+
+            for user in users:
+                categories = list(set([str(d.category) for d in user.tasks])) #task, question, rewrite, idea, compose
+
+                for category in categories:
+                    tasks = [d for d in user.tasks if d.category==category]
+                    if len(tasks)>5:
+                        for task in tasks[5:]:
+                            if category in["task", "question"]:
+                                for source in task.sources:
+                                    db.session.delete(source)
+                            if task.feedback is None:
+                                db.session.delete(task)
+                        
+            db.session.commit()
+        print("Tasks synced!")
+    except Exception as e:
+        print("Error syncing tasks:", e)
+
 def reset_words():
     """
     Called at start of new month to reset user word counts.
     """
-    users = User.query.all()
-    for user in users:
-        user.monthly_words = 0
-    
-    db.session.commit()
-    return Response(status=200)
+    try:
+        with app.app_context():
+            users = User.query.all()
+            for user in users:
+                user.monthly_words = 0
+            
+            db.session.commit()
+
+        print("Words reset!")
+    except Exception as e:
+        print("Error reseting words:", e)
+
 
 
 @app.route('/read_files', methods=['POST'])
 def read_files():
+    """
+    reads .docx or .pdf files
+    """
     MIN_CHARACTERS = 20 #prevent non-meaningful samples
     MAX_CHARACTERS = 8000
     files = request.files.getlist('file')
@@ -465,6 +484,14 @@ def read_files():
     return Response(json.dumps({"texts": [s for s in samples if len(s)>MIN_CHARACTERS]}), status=200)
 
 
-
 if __name__ == "__main__":
+    scheduler = BackgroundScheduler()
+
+    #schedule sync tasks to run at 1AM at start of every day
+    scheduler.add_job(sync_tasks, "interval", start_date='2023-04-16 01:00:00', days=1, timezone="Australia/Sydney")
+
+    #schedule reset words function to execute at end of each month
+    scheduler.add_job(reset_words, "cron", day="last", timezone="Australia/Sydney")
+
+    scheduler.start()
     app.run(debug=True)

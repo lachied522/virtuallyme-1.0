@@ -5,6 +5,7 @@ Flask-SQLAlchemy
 flask-cors
 SQLAlchemy
 sqlalchemy_utils
+apscheduler
 openai
 tiktoken
 asyncio
