@@ -17,8 +17,8 @@ from virtuallyme import *
 from docx import Document
 from pdfreader import SimplePDFViewer
 
-#DATABASE_URL = "postgresql://virtuallyme_db_user:V3qyWKGBmuwpH0To2o5eVkqa1X4nqMhR@dpg-cfskiiarrk00vm1bp320-a.singapore-postgres.render.com/virtuallyme_db" #external
-DATABASE_URL = os.getenv("DATABASE_URL") #internal
+DATABASE_URL = "postgresql://virtuallyme_db_user:V3qyWKGBmuwpH0To2o5eVkqa1X4nqMhR@dpg-cfskiiarrk00vm1bp320-a.singapore-postgres.render.com/virtuallyme_db" #external
+#DATABASE_URL = os.getenv("DATABASE_URL") #internal
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -449,9 +449,10 @@ def read_files():
     MIN_CHARACTERS = 20 #prevent non-meaningful samples
     MAX_CHARACTERS = 8000
     files = request.files.getlist('file')
-    samples = [""]
+    samples = []
     for file in files:
         extension = file.filename.split(".")[-1]
+        samples.append("") #append new sample
         try:
             if extension == "docx":
                 doc = Document(file)
