@@ -17,8 +17,8 @@ from virtuallyme import *
 from docx import Document
 from pdfreader import SimplePDFViewer
 
-DATABASE_URL = "postgresql://virtuallyme_db_user:V3qyWKGBmuwpH0To2o5eVkqa1X4nqMhR@dpg-cfskiiarrk00vm1bp320-a.singapore-postgres.render.com/virtuallyme_db" #external
-#DATABASE_URL = os.getenv("DATABASE_URL") #internal
+#DATABASE_URL = "postgresql://virtuallyme_db_user:V3qyWKGBmuwpH0To2o5eVkqa1X4nqMhR@dpg-cfskiiarrk00vm1bp320-a.singapore-postgres.render.com/virtuallyme_db" #external
+DATABASE_URL = os.getenv("DATABASE_URL") #internal
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -480,7 +480,7 @@ def read_files():
             
         except Exception as e:
             print(e)
-            return [f"Could not read file {file.filename}"]
+            samples.append(f"Could not read file {file.filename}")
     
     return Response(json.dumps({"texts": [s for s in samples if len(s)>MIN_CHARACTERS]}), status=200)
 
