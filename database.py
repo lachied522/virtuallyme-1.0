@@ -17,7 +17,6 @@ from virtuallyme import *
 from docx import Document
 from pdfreader import SimplePDFViewer
 
-#DATABASE_URL = "postgresql://virtuallyme_db_user:V3qyWKGBmuwpH0To2o5eVkqa1X4nqMhR@dpg-cfskiiarrk00vm1bp320-a.singapore-postgres.render.com/virtuallyme_db" #external
 DATABASE_URL = os.getenv("DATABASE_URL") #internal
 
 app = Flask(__name__)
@@ -102,21 +101,21 @@ def create_user():
     return Response(status=200)
 
 
-@app.route("/get_user", methods=["GET"])
-def get_user():
+@app.route("/get_user/<member_id>", methods=["GET"])
+def get_user(member_id):
     """
     Called when the page loads. Retrieves stored samples and previous task data.
 
     :param member_id: user's Memberstack ID
     """
-    user = User.query.get(request.headers.get("member_id"))
     try:
+        user = User.query.with_entities(User.name, User.description, User.monthly_words).filter_by(id=member_id).first()
         user_jobs = []
-        for job in user.jobs:
-            job_samples = [{"prompt": d.prompt, "completion": d.completion} for d in job.data if d.feedback=="user-upload"]
-            user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
+        #for job in user.jobs:
+        #    job_samples = [{"prompt": d.prompt, "completion": d.completion, "feedback": d.feedback} for d in job.data if d.feedback=="user-upload"]
+        #    user_jobs.append({"job_id": job.id, "name": job.name, "word_count": job.word_count, "data": job_samples})
         
-        all_tasks = Task.query.filter_by(user_id=request.headers.get("member_id")).order_by(Task.created_at).all()
+        all_tasks = Task.query.filter_by(user_id=member_id).order_by(Task.created_at).all()
         user_tasks = []
         for task in [d for d in all_tasks if d.category=="task"]:
             sources = [{"url": d.url, "display": d.display, "title": d.title, "preview": d.preview} for d in task.sources]
@@ -132,8 +131,8 @@ def get_user():
         user_compositions = [{"prompt": d.prompt, "completion": d.completion, "score": d.score, "created": str(d.created_at)} for d in all_tasks if d.category=="composition"]
 
         response_dict = {
+            "name": user.name,
             "description": user.description or "",
-            "about": user.about or "",
             "words": user.monthly_words or 0,
             "user": user_jobs,
             "tasks": user_tasks,
@@ -166,7 +165,7 @@ def get_data():
 
         if job_id <= 0:
             #combine all job data
-            samples = [{"completion": d.completion, "feedback": d.feedback} for job in user.jobs for d in job.data]
+            samples = [{"completion": d.completion, "feedback": d.feedback, "job_id": job.id} for job in user.jobs for d in job.data]
         elif job_id > 0:
             job = Job.query.get(job_id)
             #get job data
